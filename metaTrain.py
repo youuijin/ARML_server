@@ -14,10 +14,9 @@ import  numpy as np
 from    learner import Learner
 from    copy import deepcopy
 from aRUBattack import aRUB
-
 import advertorchMeta.attacks as attacks
 
-
+# from utils import setAttack
 
 class Meta(nn.Module):
     """
@@ -45,6 +44,7 @@ class Meta(nn.Module):
         self.imgsz = args.imgsz
         self.eps = args.eps/255
         self.test_eps = args.test_eps/255
+        self.iter = args.iter
         
         self.args = args
 
@@ -52,37 +52,36 @@ class Meta(nn.Module):
         self.meta_optim = optim.Adam(self.net.parameters(), lr=self.meta_lr)
         self.meta_optim_adv = optim.Adam(self.net.parameters(), lr=self.adv_lr)
 
-        self.at = self.setAttack(args.attack, self.eps)
-        self.test_at = self.setAttack(args.test_attack, self.test_eps)
+        self.at = self.setAttack(args.attack, self.eps, self.iter)
+        self.test_at = self.setAttack(args.test_attack, self.test_eps, self.iter)
 
-    def setAttack(self, str_at, e):
+    def setAttack(self, str_at, e, iter):
         if str_at == "PGD_L1":
-            return attacks.L1PGDAttack(self.net, eps=e, nb_iter=10)
+            return attacks.L1PGDAttack(self.net, eps=e, nb_iter=iter) # 10., 40
         elif str_at == "PGD_L2":
-            return attacks.L2PGDAttack(self.net, eps=e, nb_iter=10)
+            return attacks.L2PGDAttack(self.net, eps=e, nb_iter=iter) # 0.3, 40
         elif str_at == "PGD_Linf":
-            return attacks.LinfPGDAttack(self.net, eps=e, nb_iter=10)
+            return attacks.LinfPGDAttack(self.net, eps=e, nb_iter=iter) # 0.3, 40
         elif str_at == "FGSM":
-            return attacks.GradientSignAttack(self.net, eps=e)
+            return attacks.GradientSignAttack(self.net, eps=e) # 0.3
         elif str_at == "BIM_L2":
-            return attacks.L2BasicIterativeAttack(self.net, eps=e, nb_iter=10)
+            return attacks.L2BasicIterativeAttack(self.net, eps=e, nb_iter=iter) # 0.1, 10
         elif str_at == "BIM_Linf":
-            return attacks.LinfBasicIterativeAttack(self.net, eps=e, nb_iter=10)
+            return attacks.LinfBasicIterativeAttack(self.net, eps=e, nb_iter=iter) # 0.1, 10
         elif str_at == "MI_FGSM":
-            return attacks.MomentumIterativeAttack(self.net, eps=e, nb_iter=10) # 0.3, 40
+            return attacks.MomentumIterativeAttack(self.net, eps=e, nb_iter=iter) # 0.3, 40
         elif str_at == "CnW":
-            return attacks.CarliniWagnerL2Attack(self.net, self.n_way)
+            return attacks.CarliniWagnerL2Attack(self.net, self.n_way, binary_search_steps=9, max_iterations=iter*10) # 9, 10000
         elif str_at == "EAD":
-            return attacks.ElasticNetL1Attack(self.net, self.n_way)
+            return attacks.ElasticNetL1Attack(self.net, self.n_way, binary_search_steps=9, max_iterations=iter*10) # 9, 10000
         elif str_at == "DDN":
-            return attacks.DDNL2Attack(self.net)
+            return attacks.DDNL2Attack(self.net, nb_iter=iter*3) # 100
         elif str_at == "Single_pixel":
-            return attacks.SinglePixelAttack(self.net)
+            return attacks.SinglePixelAttack(self.net, max_pixels=iter*3) # 100
         elif str_at == "DeepFool" or str_at == "Deepfool":
-            return attacks.DeepfoolLinfAttack(self.net, self.n_way, eps=e)
+            return attacks.DeepfoolLinfAttack(self.net, self.n_way, nb_iter=iter*2, eps=e) # 50, 0.1
         elif str_at == "aRUB":
             return aRUB(self.net, rho=self.rho, q=1, n_way=self.n_way, k_qry=self.k_qry, imgc=self.imgc, imgsz=self.imgsz, device=self.device)
-        
         else:
             print("wrong type Attack")
             exit()
@@ -121,7 +120,7 @@ class Meta(nn.Module):
         task_num = x_spt.size(0)
         querysz = x_qry.size(1)
 
-        need_adv = False
+        need_adv = True
         optimizer = torch.optim.SGD(self.net.parameters(), lr=self.update_lr, momentum=0.9, weight_decay=5e-4)
         losses_q = [0 for _ in range(self.update_step + 1)]  # losses_q[i] is the loss on step i
         corrects = [0 for _ in range(self.update_step + 1)]
@@ -356,22 +355,15 @@ class Meta(nn.Module):
         return accs, accs_adv, accs_adv_prior, loss_q, loss_q_adv
     
     def get_model(self):
-        return self.net.state_dict()
+        return self.net.state_dict() # save only parameters
+        #return self.net # save all model
     
     def set_model(self, model):
-        print(torch.equal(model, self.net.state_dict()))
-        self.net.load_state_dict(model)
-        #print(self.net.state_dict())
-        #self.net.state_dict = model
-        #print(self.net.state_dict)
+        self.net.load_state_dict(model) # if model is only parameters
+        #self.net = model # if model is all model
 
-    def set_test_attack(self, attack, eps=2):
-        self.test_at = self.setAttack(attack, eps/255)
-
-    def print_logits(self, x):
-        logits_q = self.net(x, self.net.parameters(), bn_training=True)
-        return logits_q
-
+    def set_test_attack(self, attack, eps=2, iter=10):
+        self.test_at = self.setAttack(attack, eps/255, iter=iter)
 
 def main():
     pass

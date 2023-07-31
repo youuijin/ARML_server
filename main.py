@@ -60,6 +60,7 @@ def main(args):
     else:
         bound = args.eps
     sum_str_path = "./logs/runs_table/"+str(args.imgsz)+"/"+args.attack+"/"+str(bound)+"/"+str(args.meta_lr)+"_"+str(args.adv_lr)
+    #sum_str_path = "./logs/runs_table/"+str(args.imgsz)+"/noAttack/"+str(args.meta_lr)
     writer = SummaryWriter(sum_str_path, comment=args.attack+"/"+args.test_attack)
     print(sum_str_path)
     
@@ -68,7 +69,7 @@ def main(args):
 
     # batchsz here means total episode number
     mini = MiniImagenet('../', mode='train', n_way=args.n_way, k_shot=args.k_spt,
-                        k_query=args.k_qry, batchsz=1000, resize=args.imgsz) # batch size = 4000 for small scale 
+                        k_query=args.k_qry, batchsz=4000, resize=args.imgsz) # batch size = 4000 for small scale 
     
     # mini_val = MiniImagenet('../', mode='val', n_way=args.n_way, k_shot=args.k_spt,
     #                          k_query=args.k_qry,
@@ -82,18 +83,11 @@ def main(args):
             tot_step = tot_step + args.task_num
 
             x_spt, y_spt, x_qry, y_qry = x_spt.to(device), y_spt.to(device), x_qry.to(device), y_qry.to(device)
-            # logits_a = maml.print_logits(x_qry[0])
-            # model = torch.load('./models/'+str(args.imgsz)+"/"+"aRUB_2_0.001_0.0002.pth")
-            # print(type(model))
-            # maml.set_model(model)
-            # logits_b = maml.print_logits(x_qry[0])
-            # print(torch.equal(logits_a, logits_b))
-            # exit()
             accs, accs_adv, loss_q, loss_q_adv = maml(x_spt, y_spt, x_qry, y_qry)
             
             
-            if step % 2 == 0:
-                print('step:', tot_step,'/',args.epoch*1000)
+            if step % 20 == 0:
+                print('step:', tot_step,'/',args.epoch*4000)
                 print('\ttraining acc:', accs)
                 print('\ttraining acc_adv:', accs_adv)
                 writer.add_scalar("acc/train", accs[-1], tot_step)
@@ -144,6 +138,7 @@ def main(args):
         '''
         
     str_path = str(args.imgsz)+"/"+args.attack+"_"+str(bound)+"_"+str(args.meta_lr)+"_"+str(args.adv_lr)
+    #str_path = str(args.imgsz)+"/noAttack_"+str(args.meta_lr)
     torch.save(maml.get_model(), './models/'+str_path+".pth")
 
 def test_model(maml, path, device):
@@ -161,7 +156,7 @@ def test_model(maml, path, device):
         writer = SummaryWriter('./logs/test_acc/'+path+"/"+attack_name+"/"+str(args.test_eps), comment=path)
         tot_writer = SummaryWriter('./logs/test_acc/'+attack_name+"/"+str(args.test_eps)+"/"+path, comment=path)
         
-        maml.set_test_attack(attack_name, eps=args.test_eps)
+        maml.set_test_attack(attack_name, eps=args.test_eps, iter=args.iter)
         accs_all_test = []
         accsadv_all_test = []
         accsadvpr_all_test = []
@@ -203,8 +198,8 @@ if __name__ == '__main__':
     argparser.add_argument('--imgc', type=int, help='imgc', default=3)
     
     # Training options
-    argparser.add_argument('--epoch', type=int, help='epoch number', default=30)
-    argparser.add_argument('--task_num', type=int, help='meta batch size, namely task num', default=32)
+    argparser.add_argument('--epoch', type=int, help='epoch number', default=25)
+    argparser.add_argument('--task_num', type=int, help='meta batch size, namely task num', default=40)
     argparser.add_argument('--meta_lr', type=float, help='meta-level outer learning rate', default=0.001)
     argparser.add_argument('--adv_lr', type=float, help='adv-level learning rate', default=0.0002)
     argparser.add_argument('--update_lr', type=float, help='task-level inner update learning rate', default=0.01)
@@ -218,6 +213,7 @@ if __name__ == '__main__':
     argparser.add_argument('--eps', type=float, help='training attack eps', default=2) # 2/255
     argparser.add_argument('--test_eps', type=float, help='testing atttack eps', default=2) # 2/255
     argparser.add_argument('--rho', type=float, help='aRUB-rho', default=2) # 2/255
+    argparser.add_argument('--iter', type=int, help='number of iterations for iterative attack', default=10)
 
     # to test models
     argparser.add_argument('--test', action='store_true', default=False)
