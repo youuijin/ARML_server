@@ -48,8 +48,7 @@ class MiniImagenet(Dataset):
         self.querysz = self.n_way * self.k_query  # number of samples per set for evaluation
         self.resize = resize  # resize to
         self.startidx = startidx  # index label not from 0, but from startidx
-        print('shuffle DB :%s, b:%d, %d-way, %d-shot, %d-query, resize:%d' % (
-        mode, batchsz, n_way, k_shot, k_query, resize))
+        #print('shuffle DB :%s, b:%d, %d-way, %d-shot, %d-query, resize:%d' % (mode, batchsz, n_way, k_shot, k_query, resize))
 
         if mode == 'train':
 #             self.transform = transforms.Compose([lambda x: Image.open(x).convert('RGB'),

@@ -29,7 +29,7 @@ class aRUB:
         '''
         data.requires_grad = True
         logits = self.net(data, weights)
-        logits_sum = torch.sum(logits, dim=0)        
+        logits_sum = torch.sum(logits, dim=0)       
         flag = True
         for logit in logits_sum:
             logit.backward(retain_graph=True)
