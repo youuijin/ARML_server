@@ -1,36 +1,55 @@
-import advertorchMeta.attacks as attacks
-from aRUBattack import aRUB
 
-# 수정 필요 - class 로 되어 있음
+import glob, os
+import pandas as pd
+import numpy as np
+import random, torch
 
-def setAttack(self, str_at, e, iter):
-    if str_at == "PGD_L1":
-        return attacks.L1PGDAttack(self.net, eps=e, nb_iter=iter) # 10., 40
-    elif str_at == "PGD_L2":
-        return attacks.L2PGDAttack(self.net, eps=e, nb_iter=iter) # 0.3, 40
-    elif str_at == "PGD_Linf":
-        return attacks.LinfPGDAttack(self.net, eps=e, nb_iter=iter) # 0.3, 40
-    elif str_at == "FGSM":
-        return attacks.GradientSignAttack(self.net, eps=e) # 0.3
-    elif str_at == "BIM_L2":
-        return attacks.L2BasicIterativeAttack(self.net, eps=e, nb_iter=iter) # 0.1, 10
-    elif str_at == "BIM_Linf":
-        return attacks.LinfBasicIterativeAttack(self.net, eps=e, nb_iter=iter) # 0.1, 10
-    elif str_at == "MI_FGSM":
-        return attacks.MomentumIterativeAttack(self.net, eps=e, nb_iter=iter) # 0.3, 40
-    elif str_at == "CnW":
-        return attacks.CarliniWagnerL2Attack(self.net, self.n_way, binary_search_step=9, max_iterations=10000) # 9, 10000
-    elif str_at == "EAD":
-        return attacks.ElasticNetL1Attack(self.net, self.n_way, binary_search_steps=9, max_iterations=10000) # 9, 10000
-    elif str_at == "DDN":
-        return attacks.DDNL2Attack(self.net, nb_iter=iter) # 100
-    elif str_at == "Single_pixel":
-        return attacks.SinglePixelAttack(self.net, max_pixels=iter) # 100
-    elif str_at == "DeepFool" or str_at == "Deepfool":
-        return attacks.DeepfoolLinfAttack(self.net, self.n_way, nb_iter=iter, eps=e) # 50, 0.1
-    elif str_at == "aRUB":
-        return aRUB(self.net, rho=self.rho, q=1, n_way=self.n_way, k_qry=self.k_qry, imgc=self.imgc, imgsz=self.imgsz, device=self.device)
-    
+
+def fix_seed(seed):
+    # seed = 222
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+def set_str_path(args):
+    if args.loss== "R-MAML-AT":
+        sum_str_path = f"{args.imgsz}/{args.loss}/{args.attack}_{args.eps}_{args.meta_lr}_{args.alpha}"
+    elif args.loss == "trades" or args.loss =="R-MAML-trades":
+        sum_str_path = f"{args.imgsz}/{args.loss}/{args.attack}_{args.eps}_{args.meta_lr}_{args.beta}"
+    elif args.loss == "WAR":
+        sum_str_path = f"{args.imgsz}/{args.loss}/{args.attack}_{args.eps}_{args.meta_lr}_{args.zeta}"
     else:
-        print("wrong type Attack")
-        exit()
+        sum_str_path = f"{args.imgsz}/{args.loss}/{args.meta_lr}"
+    return sum_str_path
+
+def add_idx(str_path, args):
+    path_list = str_path.split("/")
+    paths = glob.glob(f"./models/{path_list[0]}/*")
+    model_paths = [(os.path.basename(i))[:-4] for i in paths]
+    print(model_paths)
+    idx = 0
+    for path in model_paths:
+        if path.startswith(path_list[1]+"_"+path_list[2]):
+            idx += 1
+    print(idx)
+
+    if args.loss != "R-MAML-AT":
+        args.alpha = "-"
+    if args.loss != "trades" or args.loss !="R-MAML-trades":
+        args.beta = "-"
+    if args.loss != "WAR":
+        args.zeta = "-"
+
+    columns = ['idx(seed)', 'model', 'attack', 'eps', 'loss', 'alpha', 'beta', 'zeta', 'mela_lr', 'scheduler', 'scheduler_args', 'task_num', 'imgsz']
+    datas = [idx, args.model, args.attack, args.eps, args.loss, args.alpha, args.beta, args.zeta, args.meta_lr, '-', '-', args.task_num, args.imgsz]
+    if idx == 0:
+        df = pd.DataFrame([datas], columns=columns)
+        df.to_csv(f"./logs/train_log/{args.loss}.csv", index=False, mode='w')
+    else:
+        df = pd.DataFrame([datas])
+        df.to_csv(f"./logs/train_log/{args.loss}.csv", index=False, header=False, mode='a')
+    return idx

@@ -1,8 +1,5 @@
 import torch
-import numpy as np
 from    torch.nn import functional as F
-from    learner import Learner
-import time
 
 class aRUB:
     def __init__(self, net, rho, q, n_way, k_qry, imgc, imgsz, device):
@@ -34,6 +31,7 @@ class aRUB:
         for logit in logits_sum:
             logit.backward(retain_graph=True)
             data_grad = torch.unsqueeze(data.grad, 1) #[75,3,28,28]->[75,1,3,28,28]
+            
             if(flag):
                 jacobian = data_grad.clone().detach()
                 flag = False
