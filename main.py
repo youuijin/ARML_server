@@ -7,7 +7,6 @@ import  argparse
 from    metaTrain import Meta
 from    utils import *
 
-import  random
 
 from torch.utils.tensorboard import SummaryWriter
 
@@ -50,6 +49,7 @@ def main(args):
     #add_log(sum_str_path, model_idx, args)
     
     writer = SummaryWriter(str_path + sum_str_path + "_" + str(model_idx), comment=args.attack)
+
     print(sum_str_path, model_idx)
 
     maml = Meta(args, config, device).to(device)
@@ -77,11 +77,11 @@ def main(args):
 
             accs, accs_adv, losses_item = maml(x_spt, y_spt, x_qry, y_qry)
             
-            if step % 20 == 0:
+            if step % 40 == 0:
                 print('step:', tot_step,'/',args.epoch*4000)
                 print('\ttraining acc:', accs)
                 print('\ttraining acc_adv:', accs_adv)
-                print('\tloss:', losses_item[0], losses_item[1], losses_item[2])
+                # print('\tloss:', losses_item[0], losses_item[1], losses_item[2])
                 writer.add_scalar("acc/train", accs, tot_step)
                 writer.add_scalar("acc_adv/train", accs_adv, tot_step)
                 writer.add_scalar("loss/train", losses_item[0], tot_step)
@@ -90,7 +90,10 @@ def main(args):
 
     dir_path = f'./models/{args.imgsz}/'
     os.makedirs(dir_path, exist_ok=True)
-    torch.save(maml.get_model(), dir_path+str(args.loss)+"_"+sum_str_path+".pth")
+    str_path = sum_str_path.split("/")
+    print(str_path)
+    torch.save(maml.get_model(), f"{dir_path}{args.loss}_{str_path[2]}_{model_idx}.pth")
+
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser()

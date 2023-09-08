@@ -57,7 +57,7 @@ class loss_function():
         logits_adv = at.perturb(fast_weights, x, y)
         loss_clean = F.cross_entropy(logits, y)
         loss_adv = (1.0/len(x))*criterion_kl(torch.log(F.softmax(logits_adv, dim=1) + epsilon), torch.log(F.softmax(logits, dim=1) + epsilon))
-
+        
         loss = loss_clean + self.beta * loss_adv
 
         return loss, loss.item(), loss_clean.item(), loss_adv.item()
