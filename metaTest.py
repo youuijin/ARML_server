@@ -156,10 +156,7 @@ class Meta(nn.Module):
             # 1. run the i-th task and compute loss for k=1~K-1
             # logits = net(x_spt, fast_weights, bn_training=True)
             # loss = F.cross_entropy(logits, y_spt)
-            if self.args.auto_no_at:
-                loss_fn = self.loss_function.set_loss(False, "no")
-            else:
-                loss_fn = self.loss_function.set_loss(False, self.loss)
+            loss_fn = self.loss_function.set_loss(False, "no")
             loss, _, _, _ = loss_fn(net, fast_weights, x_spt, y_spt, self.at)
             # 2. compute grad on theta_pi
             grad = torch.autograd.grad(loss, fast_weights)
@@ -234,9 +231,9 @@ class Meta(nn.Module):
     def set_attack(self, attack, eps, iter=10):
         self.at = self.setAttack(attack, eps/255, iter=iter)
 
-    def set_test_attack(self, attack, eps=6, iter=10):
+    def set_test_attack(self, attack, eps=6, iter=10, auto_list=[]):
         if attack=="Auto Attack":
-            self.test_at = AutoAttack(self.net, norm=self.args.auto_norm, eps=eps/255, version=self.args.auto_version, device=self.device)
+            self.test_at = AutoAttack(self.net, norm=self.args.auto_norm, eps=eps/255, version=self.args.auto_version, attacks_to_run=auto_list, device=self.device)
         else:
             self.test_at = self.setAttack(attack, eps/255, iter=iter)
 

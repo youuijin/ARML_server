@@ -8,8 +8,8 @@ import math
 class loss_function():
     def __init__(self, alpha=0.05, beta=1.0, zeta=10):
         #print("initialize lambda")
-        self.alpha = alpha # for R-MAML-AT
-        self.beta = beta # for R-MAML-trades, trades
+        self.alpha = alpha # for AT
+        self.beta = beta # for trades
         self.zeta = zeta # for WAR
         self.lamb = 0
         self.loss = self.standard_loss

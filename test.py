@@ -52,9 +52,6 @@ def main(args):
 
     paths = glob.glob(args.dir_path+"*")
     model_paths = [os.path.basename(i) for i in paths]
-    #print(model_paths)
-    #print(len(model_paths))
-    # model_paths = ['aRUB_6_0.001_2.0.pth', 'aRUB_6_0.01_10.0.pth', 'PGD_Linf_6_0.001_15.0.pth', 'PGD_Linf_6_0.001_0.7.pth', 'PGD_Linf_6_0.001_5.0.pth', 'PGD_Linf_6_0.001_10.0.pth', 'aRUB_6_0.005_10.0.pth', 'aRUB_6_0.001_15.0.pth', 'DeepFool_6_0.001_5.0.pth', 'aRUB_6_0.0005_10.0.pth', 'aRUB_6_0.005_5.0.pth', 'PGD_L2_6_0.001_1.0.pth', 'PGD_L2_6_0.001_5.0.pth', 'DeepFool_6_0.001_1.0.pth', 'aRUB_6_0.001_5.0.pth', 'PGD_Linf_6_0.001_0.5.pth', 'aRUB_6_0.001_1.0.pth', 'PGD_Linf_6_0.001_1.0.pth', 'aRUB_6_0.001_10.0.pth', 'PGD_Linf_6_0.001_2.0.pth', 'PGD_L2_6_0.001_10.0.pth']    
     thread_list = []
     
     for model in model_paths:
@@ -82,10 +79,11 @@ def main(args):
         df = pd.DataFrame(datas, columns=["model", "attack", "eps", "SA", "RA"])
     t = datetime.today().strftime("%m%d%H%M%S")
 
-    if args.auto_no_at:
-        df.to_csv(f"./logs/AAresult_csv/at_{args.auto_version}_{args.auto_norm}_{args.test_eps}_{t}.csv")
+    if args.auto_version == "custom":
+        save_str = f"{args.auto_version}_{args.auto_custom}_{args.auto_norm}_{args.test_eps}_{t}.csv"
     else:
-        df.to_csv(f"./logs/AAresult_csv/nat_{args.auto_version}_{args.auto_norm}_{args.test_eps}_{t}.csv")
+        save_str = f"{args.auto_version}_{args.auto_norm}_{args.test_eps}_{t}.csv"
+    df.to_csv(f"./logs/AAresult_csv/{save_str}")
 
 def test_model(maml, path, device):
     if path=="":
@@ -102,20 +100,26 @@ def test_model(maml, path, device):
         maml.set_loss(loss_type, loss_arg)
         maml.set_attack(path.split('_')[1], float(path.split('_')[2]))
     
-    
-
     mini_test = MiniImagenet('../', mode='test', n_way=args.n_way, k_shot=args.k_spt,
                                 k_query=args.k_qry, batchsz=50, resize=args.imgsz) # batch size = 50 for small scale
     db_test = DataLoader(mini_test, 1, shuffle=True, num_workers=0, pin_memory=True)
+    auto_list = []
     if args.auto_attack:
         attack_list = ["Auto Attack"]
+        auto_attacks = ['apgd-ce', 'apgd-t', 'fab-t', 'square']
+        for i in range(4):
+            if args.auto_custom[i]=='1':
+                auto_list.append(auto_attacks[i])
+        if len(auto_list)==0:
+            print("auto-custom mode must has at least 1 attack")
+            exit()
     else:
         attack_list = ["BIM_L2", "BIM_Linf", "CnW", "DDN", "EAD", "FGSM", "MI_FGSM", "PGD_L1", "PGD_L2", "PGD_Linf", "Single_pixel", "DeepFool"]
     for _, attack_name in enumerate(attack_list):
         fix_seed()
         print(path, attack_name)
         
-        maml.set_test_attack(attack_name, eps=args.test_eps, iter=args.iter)
+        maml.set_test_attack(attack_name, eps=args.test_eps, iter=args.iter, auto_list = auto_list)
         accs_all_test = []
         accsadv_all_test = []
         #accsadvpr_all_test = []
@@ -183,9 +187,10 @@ if __name__ == '__main__':
     # to test models
     argparser.add_argument('--dir_path', type=str, help='test model directory path', default="./models/56/")
     argparser.add_argument('--auto_attack', action='store_true', default=False)
-    argparser.add_argument('--auto_version', help='standard, plus', type=str, default="standard")
+    argparser.add_argument('--auto_version', help='standard, plus, custom', type=str, default="standard")
+    argparser.add_argument('--auto_custom', type=str, help='apgd-ce, apgd-t, fab-t, sqaure', default="1001")
+    
     argparser.add_argument('--auto_norm', help='L1, L2, Linf', type=str, default="Linf")
-    argparser.add_argument('--auto_no_at', action='store_true', help='if set true, no adversarial training at meta test phase', default=False)
     argparser.add_argument('--alpha', type=float, help='hyper-parameter for R-MAML-AT', default=0.2)
     argparser.add_argument('--beta', type=float, help='hyper-parameter for R-MAML-AT', default=1.0)
     argparser.add_argument('--zeta', type=float, help='hyper-parameter for R-MAML-AT', default=10)

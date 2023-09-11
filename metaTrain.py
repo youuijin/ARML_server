@@ -31,7 +31,6 @@ class Meta(nn.Module):
 
         self.update_lr = args.update_lr
         self.meta_lr = args.meta_lr
-        #self.adv_lr = args.adv_lr
         self.n_way = args.n_way
         self.k_spt = args.k_spt
         self.k_qry = args.k_qry
@@ -43,7 +42,6 @@ class Meta(nn.Module):
         self.imgc = args.imgc
         self.imgsz = args.imgsz
         self.eps = args.eps
-        # self.test_eps = args.test_eps/255
         self.iter = args.iter
 
         self.loss = args.loss

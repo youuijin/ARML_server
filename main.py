@@ -44,13 +44,12 @@ def main(args):
     str_path = f"./logs/runs_table/"
     sum_str_path = set_str_path(args)
     
-    model_idx = add_idx(sum_str_path, args)
-    fix_seed(model_idx)
-    #add_log(sum_str_path, model_idx, args)
+    add_log(args)
+    fix_seed()
     
-    writer = SummaryWriter(str_path + sum_str_path + "_" + str(model_idx), comment=args.attack)
+    writer = SummaryWriter(str_path + sum_str_path, comment=args.attack)
 
-    print(sum_str_path, model_idx)
+    print(sum_str_path)
 
     maml = Meta(args, config, device).to(device)
     
@@ -91,8 +90,7 @@ def main(args):
     dir_path = f'./models/{args.imgsz}/'
     os.makedirs(dir_path, exist_ok=True)
     str_path = sum_str_path.split("/")
-    print(str_path)
-    torch.save(maml.get_model(), f"{dir_path}{args.loss}_{str_path[2]}_{model_idx}.pth")
+    torch.save(maml.get_model(), f"{dir_path}{args.loss}_{str_path[2]}.pth")
 
 
 if __name__ == '__main__':
@@ -125,10 +123,17 @@ if __name__ == '__main__':
     argparser.add_argument('--iter', type=int, help='number of iterations for iterative attack', default=10)
     
     # Loss function options
-    argparser.add_argument('--loss', type=str, help='R-MAML-AT, R-MAML-trades, trades, WAR, no', default="R-MAML-AT")
+    argparser.add_argument('--loss', type=str, help='AT, AT-WAR, trades, trades-WAR, no', default="AT")
     argparser.add_argument('--beta', type=float, help='using for trades', default=1.0)
     argparser.add_argument('--zeta', type=float, help='WAR parameter', default=30)
+    argparser.add_argument('--sche', type=str, help='learning rate scheduler for meta_lr', default='')
+    argparser.add_argument('--sche_arg1', type=float, help='learning rate scheduler argument 1', default=-1)
+    argparser.add_argument('--sche_arg2', type=float, help='learning rate scheduler argument 2', default=-1)
 
     args = argparser.parse_args()
+
+    check_result = check_args(args)
+    if not check_result:
+        exit()
 
     main(args)
