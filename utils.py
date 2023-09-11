@@ -40,9 +40,9 @@ def add_idx(str_path, args):
     alpha, beta, zeta = args.alpha, args.beta, args.zeta
     
 
-    if args.loss != "AT" and args.loss != "AT-WAR":
+    if args.loss != "AT":
         alpha = "-"
-    if args.loss != "trades" and args.loss != "trades-WAR":
+    if args.loss != "trades":
         beta = "-"
     if args.loss != "AT-WAR" and args.loss != "trades-WAR":
         zeta = "-"
@@ -59,9 +59,9 @@ def add_idx(str_path, args):
 def add_log(args):
     alpha, beta, zeta = args.alpha, args.beta, args.zeta
     
-    if args.loss != "AT" and args.loss != "AT-WAR":
+    if args.loss != "AT":
         alpha = "-"
-    if args.loss != "trades" and args.loss != "trades-WAR":
+    if args.loss != "trades":
         beta = "-"
     if args.loss != "AT-WAR" and args.loss != "trades-WAR":
         zeta = "-"
@@ -86,3 +86,12 @@ def check_args(args):
     if args.model not in ["conv3", "resnet18"]:
         print("select valid models")
         return False
+    if args.device_num not in [0,1,2,3]: 
+        print("GPU number can be 0, 1, 2, 3")
+        return False
+    if args.sche != "":
+        if args.sche_arg1 == -1:
+            print(f"learning rate scheduler argument Error")
+            return False
+        if args.sche == "AT-WAR" or args.sche == "trades-WAR":
+            print()

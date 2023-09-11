@@ -41,10 +41,14 @@ def main(args):
 
     device = torch.device('cuda:'+str(args.device_num))
 
-    str_path = f"./logs/runs_table/"
+    if args.pretrained == "":
+        str_path = f"./logs/runs_table/"
+    else:
+        str_path = f"./logs/runs_table_pre/{args.pretrained}/"
+
     sum_str_path = set_str_path(args)
     
-    add_log(args)
+    # add_log(args)
     fix_seed()
     
     writer = SummaryWriter(str_path + sum_str_path, comment=args.attack)
@@ -52,6 +56,14 @@ def main(args):
     print(sum_str_path)
 
     maml = Meta(args, config, device).to(device)
+    if args.pretrained != "":
+        print(f"use pre-trained model {args.pretrained}")
+        params = torch.load("./pretrained_models/"+args.pretrained)
+        w = torch.nn.Parameter(torch.ones(args.n_way, 32 * s * s))
+        torch.nn.init.kaiming_normal_(w)
+        params['vars.12'] = w
+        params['vars.13'] = torch.nn.Parameter(torch.zeros(args.n_way))
+        maml.set_model(params)
     
     tmp = filter(lambda x: x.requires_grad, maml.parameters())
     num = sum(map(lambda x: np.prod(x.shape), tmp))
@@ -64,15 +76,12 @@ def main(args):
     for _ in range(args.epoch):
         # fetch meta_batchsz num of episode each time
         db = DataLoader(mini, args.task_num, shuffle=True, num_workers=0, pin_memory=True, drop_last=True)
+        maml.start_epoch() # lambda 초기화 (0으로)
+
         for step, (x_spt, y_spt, x_qry, y_qry) in enumerate(db):
             tot_step = tot_step + args.task_num
 
             x_spt, y_spt, x_qry, y_qry = x_spt.to(device), y_spt.to(device), x_qry.to(device), y_qry.to(device)
-
-            # if not args.trades:
-            #     accs, accs_adv, loss_q, loss_q_adv = maml(x_spt, y_spt, x_qry, y_qry)
-            # else:
-            #     accs, accs_adv, loss_q, loss_q_clean, loss_q_adv = maml.forward_trades(x_spt, y_spt, x_qry, y_qry)
 
             accs, accs_adv, losses_item = maml(x_spt, y_spt, x_qry, y_qry)
             
@@ -97,6 +106,7 @@ if __name__ == '__main__':
     argparser = argparse.ArgumentParser()
     # Meta-learning options
     argparser.add_argument('--model', type=str, help='model architecture', default="conv3")
+    argparser.add_argument('--pretrained', type=str, help='pretrained model path', default="")
     argparser.add_argument('--n_way', type=int, help='n way', default=5)
     argparser.add_argument('--k_spt', type=int, help='k shot for support set', default=1)
     argparser.add_argument('--k_qry', type=int, help='k shot for query set', default=15)
@@ -132,8 +142,8 @@ if __name__ == '__main__':
 
     args = argparser.parse_args()
 
-    check_result = check_args(args)
-    if not check_result:
-        exit()
+    # check_result = check_args(args)
+    # if not check_result:
+    #     exit()
 
     main(args)

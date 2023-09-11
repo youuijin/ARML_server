@@ -49,7 +49,6 @@ def main(args):
 
     device = torch.device('cuda:'+str(args.device_num))
 
-
     paths = glob.glob(args.dir_path+"*")
     model_paths = [os.path.basename(i) for i in paths]
     thread_list = []

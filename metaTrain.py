@@ -44,6 +44,8 @@ class Meta(nn.Module):
         self.eps = args.eps
         self.iter = args.iter
 
+        self.lamb = 0
+
         self.loss = args.loss
         
         self.args = args
@@ -142,7 +144,7 @@ class Meta(nn.Module):
                 # logits = self.net(x_spt[i], fast_weights, bn_training=True)
                 # loss = F.cross_entropy(logits, y_spt[i])
                 loss_fn = Loss.set_loss(False, self.loss)
-                loss, _, _, _ = loss_fn(self.net, fast_weights, x_spt[i], y_spt[i], self.at)
+                loss, _, _, _, _ = loss_fn(self.net, fast_weights, x_spt[i], y_spt[i], self.at, self.lamb)
                 # 2. compute grad on theta_pi
                 grad = torch.autograd.grad(loss, fast_weights)      
                 # 3. theta_pi = theta_pi - train_lr * grad
@@ -160,13 +162,14 @@ class Meta(nn.Module):
                     # loss_q_adv = F.cross_entropy(logits_q_adv, y_qry[i])
                     # losses_q_adv[k + 1] = losses_q_adv[k+1] + loss_q_adv
 
-                    loss_q, loss_item, loss_clean_item, loss_adv_item = loss_fn(self.net, fast_weights, x_qry[i], y_qry[i], self.at)
+                    loss_q, loss_item, loss_clean_item, loss_adv_item, lamb = loss_fn(self.net, fast_weights, x_qry[i], y_qry[i], self.at, self.lamb)
 
                     losses += loss_q
                     losses_item[0] += loss_item
                     losses_item[1] += loss_clean_item
                     losses_item[2] += loss_adv_item
                     # losses_adv += loss_q_adv
+                    self.lamb = lamb
 
                     logits_q = self.net(x_qry[i], fast_weights, bn_training=True)
                     logits_q_adv = self.at.perturb(fast_weights, x_qry[i], y_qry[i])
@@ -210,6 +213,13 @@ class Meta(nn.Module):
     def get_model(self):
         return self.net.state_dict() # save only parameters
         #return self.net # save all model
+
+    def set_model(self, model):
+        self.net.load_state_dict(model) # if model is only parameters
+        #self.net = model # if model is all model
+    
+    def start_epoch(self):
+        self.lamb = 0
 
 def main():
     pass

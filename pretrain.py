@@ -8,6 +8,7 @@ from    learner import Learner
 
 import torchvision 
 import torchvision.transforms as transforms
+from torchvision import models
 
 from torch.utils.tensorboard import SummaryWriter
 
@@ -42,7 +43,7 @@ def main(args):
 
     device = torch.device('cuda:'+str(args.device_num))
 
-    str_path = f"./logs/train_pretrained/{args.lr}_MultiStepLR"
+    str_path = f"./logs/train_pretrained/resnet18/{args.lr}_StepLR_save"
     # sum_str_path = set_str_path(args)
     
     # add_log(args)
@@ -50,8 +51,12 @@ def main(args):
     
     writer = SummaryWriter(str_path)
 
-    net = Learner(config, args.imgc, args.imgsz).to(device)
-    
+    # net = Learner(config, args.imgc, args.imgsz).to(device)
+    net = models.resnet18()
+    input_features_fc_layer = net.fc.in_features # fc layer 채널 수 얻기
+    net.fc = torch.nn.Linear(input_features_fc_layer, args.n_way, bias=False) # fc layer 수정'
+    net = net.to(device)
+
     # tmp = filter(lambda x: x.requires_grad, maml.parameters())
     # num = sum(map(lambda x: np.prod(x.shape), tmp))
 
@@ -70,9 +75,9 @@ def main(args):
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(net.parameters(), lr=args.lr, momentum=0.9)
     #scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lambda epoch: 0.98 ** epoch)
-    #scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=20, eta_min=0)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[15,40], gamma=0.5)
+    # scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[15,40], gamma=0.5)
     for epoch in range(args.epoch):
         net.train()
         train_loss = 0
@@ -123,10 +128,10 @@ def main(args):
         writer.add_scalar("loss/val", test_loss, epoch)
 
         print(f"epoch: {epoch}\tlr: {scheduler.get_last_lr()}\ttrain acc: {round(train_acc*100, 2)}%, test acc: {round(test_acc*100, 2)}%")
-        # print(f"epoch: {epoch}\ttrain acc: {round(train_acc*100, 2)}%, test acc: {round(test_acc*100, 2)}%")
+        #print(f"epoch: {epoch}\ttrain acc: {round(train_acc*100, 2)}%, test acc: {round(test_acc*100, 2)}%")
     dir_path = f'./pretrained_models/'
     os.makedirs(dir_path, exist_ok=True)
-    torch.save(net.state_dict(), f"{dir_path}{args.lr}.pth")
+    torch.save(net.state_dict(), f"{dir_path}resnet18_{args.lr}_StepLR.pth")
 
 
 if __name__ == '__main__':

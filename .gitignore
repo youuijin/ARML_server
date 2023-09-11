@@ -6,3 +6,5 @@ python_exe3.ipynb
 python_exe4.ipynb
 /__pycache__
 /cifar10
+/models_past
+/pretrained_models

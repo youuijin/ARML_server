@@ -284,3 +284,6 @@ class Learner(nn.Module):
         """
         return self.vars
     
+    def set_parameters(self, param):
+        self.vars = param
+    
