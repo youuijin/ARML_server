@@ -18,6 +18,18 @@ def mean_confidence_interval(accs, confidence=0.95):
     return m, h
 
 def main(args):
+    
+    # """"""
+    # params = torch.load("./pretrained_models/"+args.pretrained)
+    # # print(params)
+    # # print(type(params))
+    # for idx, data in params.items():
+    #     print(idx, data.shape)
+
+    # exit()
+    # """"""
+
+
     s = (args.imgsz-2)//2
     s = (s-2)//2
     s = s-3
@@ -76,7 +88,7 @@ def main(args):
     for _ in range(args.epoch):
         # fetch meta_batchsz num of episode each time
         db = DataLoader(mini, args.task_num, shuffle=True, num_workers=0, pin_memory=True, drop_last=True)
-        maml.start_epoch() # lambda 초기화 (0으로)
+        # maml.start_epoch() # lambda 초기화 (0으로)
 
         for step, (x_spt, y_spt, x_qry, y_qry) in enumerate(db):
             tot_step = tot_step + args.task_num
@@ -95,6 +107,8 @@ def main(args):
                 writer.add_scalar("loss/train", losses_item[0], tot_step)
                 writer.add_scalar("loss_clean/train", losses_item[1], tot_step)
                 writer.add_scalar("loss_adv/train", losses_item[2], tot_step)
+                if args.loss.find("WAR")>=0:
+                    writer.add_scalar("lambda", maml.get_lambda(), tot_step)
 
     dir_path = f'./models/{args.imgsz}/'
     os.makedirs(dir_path, exist_ok=True)

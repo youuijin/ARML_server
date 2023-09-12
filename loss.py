@@ -27,6 +27,9 @@ class loss_function():
             return self.AT_WAR_loss
         elif(loss_str=="trades-WAR"):
             return self.trades_WAR_loss
+        else:
+            print("Wrong Type Loss")
+            exit()
 
     # return : loss(include grad), loss, loss_clean, loss_adv    
     def standard_loss(self, model, fast_weights, x, y, at, _):
@@ -76,7 +79,7 @@ class loss_function():
         #loss_adv = max(F.cross_entropy(logits_adv, y) - F.cross_entropy(logits, y),0)
 
         lamb = lamb + alpha*(self.zeta-(loss_clean.item()/(loss_robust.item()+epsilon)))
-        lamb = np.clip(lamb, 0, 1)
+        lamb = max(lamb, 0)
         #print(self.lamb)
         if(math.isnan(lamb)):
             exit()
@@ -94,14 +97,15 @@ class loss_function():
         logits_adv = at.perturb(fast_weights, x, y)
 
         loss_clean = F.cross_entropy(logits, y)
-        loss_adv = (1.0/len(x))*criterion_kl(torch.log(F.softmax(logits_adv, dim=1) + epsilon), torch.log(F.softmax(logits, dim=1) + epsilon))
+        loss_robust = (1.0/len(x))*criterion_kl(torch.log(F.softmax(logits_adv, dim=1) + epsilon), torch.log(F.softmax(logits, dim=1) + epsilon))
 
-        if(loss_adv>=loss_clean):
-            loss_robust = loss_adv - F.cross_entropy(logits, y)
-        else:
-            loss_robust = torch.tensor(0).to(logits.device)
+        # if(loss_adv>=loss_clean):
+        #     loss_robust = loss_adv - F.cross_entropy(logits, y)
+        # else:
+        #     loss_robust = torch.tensor(0).to(logits.device)
 
         lamb = lamb + alpha*(self.zeta-(loss_clean.item()/(loss_robust.item()+epsilon)))
+        lamb = max(lamb, 0)
         #self.lamb = np.clip(lamb, 0, 1)
         #print(self.lamb)
         if(math.isnan(lamb)):
@@ -109,4 +113,4 @@ class loss_function():
 
         loss = loss_clean + lamb * loss_robust
 
-        return loss, loss.item(), loss_clean.item(), loss_adv.item(), lamb
+        return loss, loss.item(), loss_clean.item(), loss_robust.item(), lamb

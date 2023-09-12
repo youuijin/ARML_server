@@ -221,6 +221,9 @@ class Meta(nn.Module):
     def start_epoch(self):
         self.lamb = 0
 
+    def get_lambda(self):
+        return self.lamb
+
 def main():
     pass
 
