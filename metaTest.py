@@ -17,7 +17,7 @@ import advertorchMeta.attacks as attacks
 
 from autoattackMeta import AutoAttack
 
-from loss import loss_function
+# from loss import loss_function
 
 class Meta(nn.Module):
     """
@@ -42,12 +42,12 @@ class Meta(nn.Module):
 
         self.imgc = args.imgc
         self.imgsz = args.imgsz
-        self.eps = args.eps/255
+        # self.eps = args.eps/255
         self.test_eps = args.test_eps/255
         self.iter = args.iter
 
-        self.loss = "no"
-        self.loss_function = loss_function(args.alpha, args.beta, args.zeta)
+        # self.loss = "no"
+        # self.loss_function = loss_function(args.alpha, args.beta, args.zeta)
         
         self.args = args
 
@@ -55,8 +55,8 @@ class Meta(nn.Module):
         self.meta_optim = optim.Adam(self.net.parameters(), lr=self.meta_lr)
         #self.meta_optim_adv = optim.Adam(self.net.parameters(), lr=self.adv_lr)
 
-        self.at = self.setAttack(args.attack, self.eps, self.iter)
-        self.test_at = self.setAttack(args.test_attack, self.test_eps, self.iter)
+        # self.at = self.setAttack(args.attack, self.eps, self.iter)
+        self.test_at = self.set_test_attack(args.test_attack, self.test_eps, self.iter)
         self.aa = args.auto_attack
 
     def setAttack(self, str_at, e, iter):
@@ -152,18 +152,20 @@ class Meta(nn.Module):
             optimizer.zero_grad()
             adv_inp_adv = self.test_at.perturb(fast_weights, data, label)
         '''
+        # loss_fn = self.loss_function.set_loss(False, "no")
         for k in range(1, self.update_step_test):
             # 1. run the i-th task and compute loss for k=1~K-1
-            # logits = net(x_spt, fast_weights, bn_training=True)
-            # loss = F.cross_entropy(logits, y_spt)
-            loss_fn = self.loss_function.set_loss(False, "no")
-            loss, _, _, _ = loss_fn(net, fast_weights, x_spt, y_spt, self.at)
+            logits = net(x_spt, fast_weights, bn_training=True)
+            loss = F.cross_entropy(logits, y_spt)
+        
+
+            #loss, _, _, _, _ = loss_fn(net, fast_weights, x_spt, y_spt, _, 0)
             # 2. compute grad on theta_pi
             grad = torch.autograd.grad(loss, fast_weights)
             # 3. theta_pi = theta_pi - train_lr * grad
             fast_weights = list(map(lambda p: p[1] - self.update_lr * p[0], zip(grad, fast_weights)))
 
-            logits_q = net(x_qry, fast_weights, bn_training=True)
+            # logits_q = net(x_qry, fast_weights, bn_training=True)
             # loss_q will be overwritten and just keep the loss_q on last update step.
             # loss_q = F.cross_entropy(logits_q, y_qry)
             
@@ -215,25 +217,28 @@ class Meta(nn.Module):
         self.net.load_state_dict(model) # if model is only parameters
         #self.net = model # if model is all model
 
-    def set_loss(self, loss, loss_arg):
-        self.loss = loss
-        if(loss=="no"):
-            self.loss_function = loss_function(self.args.alpha, self.args.beta, self.args.zeta)
-        elif(loss=="R-MAML-AT"):
-            self.loss_function = loss_function(loss_arg, self.args.beta, self.args.zeta)
-        elif(loss=="R-MAML-trades"):
-            self.loss_function = loss_function(self.args.alpha, loss_arg, self.args.zeta)
-        elif(loss=="trades"):
-            self.loss_function = loss_function(self.args.alpha, loss_arg, self.args.zeta)
-        elif(loss=="WAR"):
-            self.loss_function = loss_function(self.args.alpha, self.args.beta, loss_arg)
+    # def set_loss(self, loss, loss_arg):
+    #     self.loss = loss
+    #     if(loss=="no"):
+    #         self.loss_function = loss_function(self.args.alpha, self.args.beta, self.args.zeta)
+    #     elif(loss=="R-MAML-AT"):
+    #         self.loss_function = loss_function(loss_arg, self.args.beta, self.args.zeta)
+    #     elif(loss=="R-MAML-trades"):
+    #         self.loss_function = loss_function(self.args.alpha, loss_arg, self.args.zeta)
+    #     elif(loss=="trades"):
+    #         self.loss_function = loss_function(self.args.alpha, loss_arg, self.args.zeta)
+    #     elif(loss=="WAR"):
+    #         self.loss_function = loss_function(self.args.alpha, self.args.beta, loss_arg)
     
-    def set_attack(self, attack, eps, iter=10):
-        self.at = self.setAttack(attack, eps/255, iter=iter)
+    # def set_attack(self, attack, eps, iter=10):
+    #     self.at = self.setAttack(attack, eps/255, iter=iter)
 
     def set_test_attack(self, attack, eps=6, iter=10, auto_list=[]):
         if attack=="Auto Attack":
-            self.test_at = AutoAttack(self.net, norm=self.args.auto_norm, eps=eps/255, version=self.args.auto_version, attacks_to_run=auto_list, device=self.device)
+            if self.args.auto_version=="custom":
+                self.test_at = AutoAttack(self.net, norm=self.args.auto_norm, eps=eps/255, version=self.args.auto_version, attacks_to_run=auto_list, device=self.device)
+            else:
+                self.test_at = AutoAttack(self.net, norm=self.args.auto_norm, eps=eps/255, version=self.args.auto_version, device=self.device)
         else:
             self.test_at = self.setAttack(attack, eps/255, iter=iter)
 

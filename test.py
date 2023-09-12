@@ -52,8 +52,25 @@ def main(args):
     paths = glob.glob(args.dir_path+"*")
     model_paths = [os.path.basename(i) for i in paths]
     thread_list = []
+
+    if args.auto_version == "custom":
+        save_str = f"{args.auto_version}_{args.auto_custom}_{args.auto_norm}_{args.test_eps}.csv"
+    else:
+        save_str = f"{args.auto_version}_{args.auto_norm}_{args.test_eps}.csv"
+    
+    if os.path.isfile(f"./logs/AAresult_csv/{save_str}") == False:
+        df = pd.DataFrame([], columns=["model", "SA", "RA", "date"])
+        df.to_csv(f"./logs/AAresult_csv/{save_str}", header=True, mode='w')
+    
+    csvs = pd.read_csv(f"./logs/AAresult_csv/{save_str}")
+    
+    csv_models = []
+    for _, data in csvs.iterrows():
+        csv_models.append(data['model'])
     
     for model in model_paths:
+        if model in csv_models:
+            continue
         maml = Meta(args, config, device).to(device)
         t = threading.Thread(target=test_model, args=(maml, model, device, ))#TODO
         t.daemon = True
@@ -71,18 +88,13 @@ def main(args):
         datas.append(temp)
 
     if args.auto_attack:
-        datas = sorted(datas, key=lambda x: (x[0]))
-        df = pd.DataFrame(datas, columns=["model", "SA", "RA"])
+        #datas = sorted(datas, key=lambda x: (x[0]))
+        df = pd.DataFrame(datas, columns=["model", "SA", "RA", "date"])
     else:
         datas = sorted(datas, key=lambda x: (x[0], x[1]))
         df = pd.DataFrame(datas, columns=["model", "attack", "eps", "SA", "RA"])
-    t = datetime.today().strftime("%m%d%H%M%S")
-
-    if args.auto_version == "custom":
-        save_str = f"{args.auto_version}_{args.auto_custom}_{args.auto_norm}_{args.test_eps}_{t}.csv"
-    else:
-        save_str = f"{args.auto_version}_{args.auto_norm}_{args.test_eps}_{t}.csv"
-    df.to_csv(f"./logs/AAresult_csv/{save_str}")
+    
+    df.to_csv(f"./logs/AAresult_csv/{save_str}", header=False, mode='a')
 
 def test_model(maml, path, device):
     if path=="":
@@ -93,11 +105,11 @@ def test_model(maml, path, device):
     model = torch.load(str_path)
     maml.set_model(model)
 
-    loss_type = path.split('_')[0]
-    if loss_type!="no":
-        loss_arg = path.split('_')[4]
-        maml.set_loss(loss_type, loss_arg)
-        maml.set_attack(path.split('_')[1], float(path.split('_')[2]))
+    # loss_type = path.split('_')[0]
+    # if loss_type!="no":
+    #     # loss_arg = path.split('_')[4]
+    #     # maml.set_loss(loss_type, loss_arg)
+    #     maml.set_attack(path.split('_')[1], float(path.split('_')[2]))
     
     mini_test = MiniImagenet('../', mode='test', n_way=args.n_way, k_shot=args.k_spt,
                                 k_query=args.k_qry, batchsz=50, resize=args.imgsz) # batch size = 50 for small scale
@@ -135,10 +147,11 @@ def test_model(maml, path, device):
         accs = np.array(accs_all_test).mean(axis=0).astype(np.float16)
         accs_adv = np.array(accsadv_all_test).mean(axis=0).astype(np.float16)
         #accs_adv_prior = np.array(accsadvpr_all_test).mean(axis=0).astype(np.float16)
+        t = datetime.today().strftime("%m%d%H%M%S")
         if args.auto_attack:
-            q.put([path, accs, accs_adv])
+            q.put([path, accs, accs_adv, t])
         else:
-            q.put([path, attack_name, args.test_eps, accs, accs_adv])
+            q.put([path, attack_name, args.test_eps, accs, accs_adv, t])
 
 def fix_seed():
     seed = 222
@@ -172,12 +185,12 @@ if __name__ == '__main__':
     argparser.add_argument('--device_num', type=int, help='what gpu to use', default=0)
 
     # Adversarial training options
-    argparser.add_argument('--attack', type=str, default="aRUB")
-    argparser.add_argument('--eps', type=float, help='training attack eps', default=6) # 6/255
+    # argparser.add_argument('--attack', type=str, default="aRUB")
+    # argparser.add_argument('--eps', type=float, help='training attack eps', default=6) # 6/255
     # argparser.add_argument('--rho', type=float, help='aRUB-rho', default=6) # 6/255
     argparser.add_argument('--iter', type=int, help='number of iterations for iterative attack', default=10)
     # argparser.add_argument('--trades', action='store_true', help='using trades adversarial training', default=False)
-    argparser.add_argument('--loss', type=str, help='R-MAML, R-MAML-trades, trades, WAR, no', default="R-MAML")
+    # argparser.add_argument('--loss', type=str, help='R-MAML, R-MAML-trades, trades, WAR, no', default="R-MAML")
 
     # adversarial attack options
     argparser.add_argument('--test_attack', type=str, default="PGD-Linf")
@@ -185,7 +198,7 @@ if __name__ == '__main__':
     
     # to test models
     argparser.add_argument('--dir_path', type=str, help='test model directory path', default="./models/56/")
-    argparser.add_argument('--auto_attack', action='store_true', default=False)
+    argparser.add_argument('--auto_attack', action='store_true', default=True)
     argparser.add_argument('--auto_version', help='standard, plus, custom', type=str, default="standard")
     argparser.add_argument('--auto_custom', type=str, help='apgd-ce, apgd-t, fab-t, sqaure', default="1001")
     
