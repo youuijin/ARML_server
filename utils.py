@@ -15,15 +15,17 @@ def fix_seed(seed=222):
     torch.backends.cudnn.benchmark = False
 
 def set_str_path(args):
-    if args.loss.startswith("AT"):
+    if args.loss == ("AT"):
         sum_str_path = f"{args.imgsz}/{args.loss}/{args.attack}_{args.eps}_{args.meta_lr}_{args.alpha}"
-    elif args.loss.startswith("trades"):
+    elif args.loss == ("trades"):
         sum_str_path = f"{args.imgsz}/{args.loss}/{args.attack}_{args.eps}_{args.meta_lr}_{args.beta}"
+    elif args.loss.find("WAR") >= 0:
+        sum_str_path = f"{args.imgsz}/{args.loss}/{args.attack}_{args.eps}_{args.meta_lr}_{args.zeta}"
     else:
         sum_str_path = f"{args.imgsz}/{args.loss}/{args.meta_lr}"
 
-    if args.loss.find("WAR") >= 0:
-        sum_str_path += f"_{args.zeta}"
+    # if args.loss.find("WAR") >= 0:
+    #     sum_str_path += f"_{args.zeta}"
 
     return sum_str_path
 

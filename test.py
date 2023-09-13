@@ -6,6 +6,8 @@ from    torch.utils.data import DataLoader
 import  argparse
 from    metaTest import Meta
 
+from torch.utils.tensorboard import SummaryWriter
+
 import  threading
 import  queue
 import  random
@@ -50,7 +52,8 @@ def main(args):
     device = torch.device('cuda:'+str(args.device_num))
 
     paths = glob.glob(args.dir_path+"*")
-    model_paths = [os.path.basename(i) for i in paths]
+    #model_paths = [os.path.basename(i) for i in paths]
+    model_paths = ["no_0.001.pth", "trades_PGD-Linf_6.0_0.001_2.0.pth"]
     thread_list = []
 
     if args.auto_version == "custom":
@@ -128,21 +131,30 @@ def test_model(maml, path, device):
         attack_list = ["BIM_L2", "BIM_Linf", "CnW", "DDN", "EAD", "FGSM", "MI_FGSM", "PGD_L1", "PGD_L2", "PGD_Linf", "Single_pixel", "DeepFool"]
     for _, attack_name in enumerate(attack_list):
         fix_seed()
+        writer = SummaryWriter("./steps/4/"+path, comment=attack_name)
         print(path, attack_name)
         
         maml.set_test_attack(attack_name, eps=args.test_eps, iter=args.iter, auto_list = auto_list)
         accs_all_test = []
         accsadv_all_test = []
         #accsadvpr_all_test = []
+        step_accs = [0 for i in range(args.update_step_test+1)]
+        step_accs_adv = [0 for i in range(args.update_step_test+1)]
 
         for x_spt, y_spt, x_qry, y_qry in db_test:
             x_spt, y_spt, x_qry, y_qry = x_spt.squeeze(0).to(device), y_spt.squeeze(0).to(device), \
                                             x_qry.squeeze(0).to(device), y_qry.squeeze(0).to(device)
 
-            accs, accs_adv = maml.finetunning(x_spt, y_spt, x_qry, y_qry)
+            accs, accs_adv, step_acc = maml.finetunning(x_spt, y_spt, x_qry, y_qry)
             accs_all_test.append(accs)
             accsadv_all_test.append(accs_adv)
+            step_accs = [step_accs[i]+step_acc[i][0] for i in range(args.update_step_test+1)]
+            step_accs_adv = [step_accs_adv[i]+step_acc[i][1] for i in range(args.update_step_test+1)]
             #accsadvpr_all_test.append(accs_adv_prior)
+        
+        for i in range(args.update_step_test+1):
+            writer.add_scalar("acc", step_accs[i]/10, i)
+            writer.add_scalar("acc_adv", step_accs_adv[i]/10, i)
 
         accs = np.array(accs_all_test).mean(axis=0).astype(np.float16)
         accs_adv = np.array(accsadv_all_test).mean(axis=0).astype(np.float16)
