@@ -73,10 +73,30 @@ class Learner(nn.Module):
                 running_mean = nn.Parameter(torch.zeros(param[0]), requires_grad=False)
                 running_var = nn.Parameter(torch.ones(param[0]), requires_grad=False)
                 self.vars_bn.extend([running_mean, running_var])
+            elif name == 'res_basic':
+                # param = [in_channels, out_channels, stride, downsample=False]
+                # 아래로 수정 -> [n_block, ch_out, ch_in, kernelsz, kernelsz, stride, padding]
+                # conv2d, bn, relu, conv2d, bn, add, relu
+                for _ in range(param[0]):
+                    # conv2d
+                    w = nn.Parameter(torch.ones(*param[1:5]))
+                    torch.nn.init.kaiming_normal_(w)
+                    self.vars.append(w)
+                    self.vars.append(nn.Parameter(torch.zeros(param[1])))
 
+                    # bn
+                    w = nn.Parameter(torch.ones(param[1]))
+                    self.vars.append(w)
+                    self.vars.append(nn.Parameter(torch.zeros(param[1])))
+                    running_mean = nn.Parameter(torch.zeros(param[1]), requires_grad=False)
+                    running_var = nn.Parameter(torch.ones(param[1]), requires_grad=False)
+                    self.vars_bn.extend([running_mean, running_var])
 
-            elif name in ['tanh', 'relu', 'upsample', 'avg_pool2d', 'max_pool2d',
-                          'flatten', 'reshape', 'leakyrelu', 'sigmoid']:
+                    # relu
+                    # no parameters
+
+            elif name in ['tanh', 'relu', 'upsample', 'avg_pool2d', 'max_pool2d','adaptive_avg_pool2d',
+                          'adaptive_max_pool2d', 'flatten', 'reshape', 'leakyrelu', 'sigmoid']:
                 continue
             else:
                 raise NotImplementedError
@@ -102,12 +122,21 @@ class Learner(nn.Module):
                 tmp = 'leakyrelu:(slope:%f)'%(param[0])
                 info += tmp + '\n'
 
+            elif name == 'res_basic':
+                tmp = 'basic residual:(n:%d, ch_in:%d, ch_out:%d, k:%dx%d, stride:%d, padding:%d)'  %(param[0], param[2], param[1], param[3], param[4], param[5], param[6])
+                info += tmp + '\n'
 
             elif name == 'avg_pool2d':
                 tmp = 'avg_pool2d:(k:%d, stride:%d, padding:%d)'%(param[0], param[1], param[2])
                 info += tmp + '\n'
             elif name == 'max_pool2d':
                 tmp = 'max_pool2d:(k:%d, stride:%d, padding:%d)'%(param[0], param[1], param[2])
+                info += tmp + '\n'
+            elif name == 'adaptive_avg_pool2d':
+                tmp = 'adaptive_avg_pool2d:(output_sz:(%dx%d))'%(param[0], param[1])
+                info += tmp + '\n'
+            elif name == 'adaptive_max_pool2d':
+                tmp = 'adaptive_max_pool2d:(output_sz:(%dx%d))'%(param[0], param[1])
                 info += tmp + '\n'
             elif name in ['flatten', 'tanh', 'relu', 'upsample', 'reshape', 'sigmoid', 'use_logits', 'bn']:
                 tmp = name + ':' + str(tuple(param))
@@ -161,6 +190,27 @@ class Learner(nn.Module):
                 x = F.batch_norm(x, running_mean, running_var, weight=w, bias=b, training=bn_training)
                 idx += 2
                 bn_idx += 2
+            elif name == 'res_basic':
+                i = x
+                for t in range(param[0]):
+                    # conv2d
+                    w, b = vars[idx], vars[idx + 1]
+                    x = F.conv2d(x, w, b, stride=param[5], padding=param[6])
+                    idx += 2
+            
+                    # bn2d
+                    w, b = vars[idx], vars[idx + 1]
+                    running_mean, running_var = self.vars_bn[bn_idx], self.vars_bn[bn_idx+1]
+                    x = F.batch_norm(x, running_mean, running_var, weight=w, bias=b, training=bn_training)
+                    idx += 2
+                    bn_idx += 2
+
+                    if t == param[0]-1:
+                        x += i
+                    
+                    # relu
+                    x = F.relu(x, inplace=True)
+
             elif name == 'flatten':
                 # print(x.shape)
                 x = x.view(x.size(0), -1)
@@ -181,6 +231,10 @@ class Learner(nn.Module):
                 x = F.max_pool2d(x, param[0], param[1], param[2])
             elif name == 'avg_pool2d':
                 x = F.avg_pool2d(x, param[0], param[1], param[2])
+            elif name == 'adaptive_avg_pool2d':
+                x = F.adaptive_avg_pool2d(x, (param[0], param[1]))
+            elif name == 'adaptive_max_pool2d':
+                x = F.adaptive_max_pool2d(x, (param[0], param[1]))
 
             else:
                 raise NotImplementedError
@@ -231,6 +285,29 @@ class Learner(nn.Module):
                 idx += 2
                 bn_idx += 2
 
+            elif name == 'res_basic':
+                i = x
+                for t in range(param[0]):
+                    # conv2d
+                    w, b = vars[idx], vars[idx + 1]
+                    x = F.conv2d(x, w, b, stride=param[5], padding=param[6])
+                    idx += 2
+            
+                    # bn2d
+                    '''
+                    w, b = vars[idx], vars[idx + 1]
+                    running_mean, running_var = self.vars_bn[bn_idx], self.vars_bn[bn_idx+1]
+                    x = F.batch_norm(x, running_mean, running_var, weight=w, bias=b, training=bn_training)
+                    '''
+                    idx += 2
+                    bn_idx += 2
+                    
+                    if t == param[0]-1:
+                        x += i
+
+                    # relu
+                    x = F.relu(x, inplace=True)
+
             elif name == 'flatten':
                 # print(x.shape)
                 x = x.view(x.size(0), -1)
@@ -251,6 +328,10 @@ class Learner(nn.Module):
                 x = F.max_pool2d(x, param[0], param[1], param[2])
             elif name == 'avg_pool2d':
                 x = F.avg_pool2d(x, param[0], param[1], param[2])
+            elif name == 'adaptive_avg_pool2d':
+                x = F.adaptive_avg_pool2d(x, (param[0], param[1]))
+            elif name == 'adaptive_max_pool2d':
+                x = F.adaptive_max_pool2d(x, (param[0], param[1]))
 
             else:
                 raise NotImplementedError

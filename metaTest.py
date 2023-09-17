@@ -36,7 +36,7 @@ class Meta(nn.Module):
         self.k_spt = args.k_spt
         self.k_qry = args.k_qry
         # self.task_num = args.task_num
-        self.update_step = args.update_step
+        # self.update_step = args.update_step
         self.update_step_test = args.update_step_test
         self.device = device
 
@@ -121,7 +121,7 @@ class Meta(nn.Module):
         :return:
         """
         assert len(x_spt.shape) == 4
-        step_acc = []
+        # step_acc = []
 
         querysz = x_qry.size(0)
 
@@ -140,8 +140,8 @@ class Meta(nn.Module):
 
         # self.test_at = AutoAttack(net, norm=self.args.auto_norm, eps=self.test_eps, version=self.args.auto_version, device=self.device)
         # 1. run the i-th task and compute loss for k=0
-        acc, acc_adv = self.cal_acc(net, x_spt, y_spt, net.parameters())
-        step_acc.append([acc, acc_adv])
+        # acc, acc_adv = self.cal_acc(net, x_qry, y_qry, net.parameters())
+        # step_acc.append([acc, acc_adv])
 
         # logits_q = net(x_spt, fast_weights, bn_training=True)
         # pred_q = F.softmax(logits_q, dim=1).argmax(dim=1)
@@ -153,8 +153,8 @@ class Meta(nn.Module):
         grad = torch.autograd.grad(loss, net.parameters())
         fast_weights = list(map(lambda p: p[1] - self.update_lr * p[0], zip(grad, net.parameters())))
 
-        acc, acc_adv = self.cal_acc(net, x_spt, y_spt, fast_weights)
-        step_acc.append([acc, acc_adv])
+        # acc, acc_adv = self.cal_acc(net, x_qry, y_qry, fast_weights)
+        # step_acc.append([acc, acc_adv])
         
         '''
         # Adversaruak Attack
@@ -181,9 +181,9 @@ class Meta(nn.Module):
             # loss_q will be overwritten and just keep the loss_q on last update step.
             # loss_q = F.cross_entropy(logits_q, y_qry)
             
-            # Adversarial Attack
-            acc, acc_adv = self.cal_acc(net, x_spt, y_spt, fast_weights)
-            step_acc.append([acc, acc_adv])
+            # test step
+            # acc, acc_adv = self.cal_acc(net, x_qry, y_qry, fast_weights)
+            # step_acc.append([acc, acc_adv])
 
 
             if k==self.update_step - 1:
@@ -225,28 +225,11 @@ class Meta(nn.Module):
             accs_adv = correct_adv / querysz
             # accs_adv_prior = np.array(corrects_adv_prior)
 
-        return accs, accs_adv, step_acc #, accs_adv_prior
+        return accs, accs_adv #, step, accs_adv_prior
     
     
     def set_model(self, model):
         self.net.load_state_dict(model) # if model is only parameters
-        #self.net = model # if model is all model
-
-    # def set_loss(self, loss, loss_arg):
-    #     self.loss = loss
-    #     if(loss=="no"):
-    #         self.loss_function = loss_function(self.args.alpha, self.args.beta, self.args.zeta)
-    #     elif(loss=="R-MAML-AT"):
-    #         self.loss_function = loss_function(loss_arg, self.args.beta, self.args.zeta)
-    #     elif(loss=="R-MAML-trades"):
-    #         self.loss_function = loss_function(self.args.alpha, loss_arg, self.args.zeta)
-    #     elif(loss=="trades"):
-    #         self.loss_function = loss_function(self.args.alpha, loss_arg, self.args.zeta)
-    #     elif(loss=="WAR"):
-    #         self.loss_function = loss_function(self.args.alpha, self.args.beta, loss_arg)
-    
-    # def set_attack(self, attack, eps, iter=10):
-    #     self.at = self.setAttack(attack, eps/255, iter=iter)
 
     def set_test_attack(self, attack, eps=6, iter=10, auto_list=[]):
         if attack=="Auto Attack":
@@ -257,22 +240,25 @@ class Meta(nn.Module):
         else:
             self.test_at = self.setAttack(attack, eps/255, iter=iter)
 
-    def cal_acc(self, net, x, y, param):
-        # logits_q = net(data, fast_weights, bn_training=True)
-        # pred_q = F.softmax(logits_q, dim=1).argmax(dim=1)
-        # #find the correct index
-        # #corr_ind = (torch.eq(pred_q, y_qry) == True).nonzero()
-        # correct = torch.eq(pred_q, label).sum().item()  # convert to numpy
-        logits = net(x, param, bn_training=True)
-        pred = F.softmax(logits, dim=1).argmax(dim=1)
-        correct = torch.eq(pred, y).sum().item()
+    # def cal_acc(self, net, x, y, param):
+    #     # logits_q = net(data, fast_weights, bn_training=True)
+    #     # pred_q = F.softmax(logits_q, dim=1).argmax(dim=1)
+    #     # #find the correct index
+    #     # #corr_ind = (torch.eq(pred_q, y_qry) == True).nonzero()
+    #     # correct = torch.eq(pred_q, label).sum().item()  # convert to numpy
+    #     #print(len(x))
+    #     logits = net(x, param, bn_training=True)
+    #     pred = F.softmax(logits, dim=1).argmax(dim=1)
+    #     correct = torch.eq(pred, y).sum().item()
+    #     #print(correct)
 
-        # logits_adv = self.test_at.perturb(param, x, y)
-        # pred_adv = F.softmax(logits_adv, dim=1).argmax(dim=1)
-        # correct_adv = torch.eq(pred, y).sum().item()
-        accs_adv = self.test_at.run_standard_evaluation(param, x, y)
+    #     # logits_adv = self.test_at.perturb(param, x, y)
+    #     # pred_adv = F.softmax(logits_adv, dim=1).argmax(dim=1)
+    #     # correct_adv = torch.eq(pred, y).sum().item()
+    #     accs_adv = self.test_at.run_standard_evaluation(param, x, y)
+    #     #print(accs_adv)
 
-        return correct/len(x), accs_adv
+    #     return correct/len(x), accs_adv
     
 def main():
     pass

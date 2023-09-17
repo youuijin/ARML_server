@@ -131,6 +131,8 @@ class Meta(nn.Module):
         # losses_adv = 0
 
         for i in range(task_num):
+            # print(i, self.net.parameters()[0].grad.data)
+            # exit()
             # 1. run the i-th task and compute loss for k=0
             logits = self.net(x_spt[i], vars=None, bn_training=True)
             loss = F.cross_entropy(logits, y_spt[i])
@@ -153,7 +155,7 @@ class Meta(nn.Module):
                 if k == self.update_step - 1: # for meta-update
                     optimizer.zero_grad()
                     loss_fn = Loss.set_loss(True, self.loss)
-                    #loss_q, loss_clean, loss_adv = loss.
+                    # loss_q, loss_clean, loss_adv = loss.
 
                     # logits_q = self.net(x_qry[i], fast_weights, bn_training=True)
                     # loss_q = F.cross_entropy(logits_q, y_qry[i])
@@ -182,7 +184,7 @@ class Meta(nn.Module):
                         pred_q_adv = F.softmax(logits_q_adv, dim=1).argmax(dim=1)
                         correct_adv = torch.eq(pred_q_adv, y_qry[i]).sum().item()
                         corrects_adv += correct_adv
-
+        
         # end of all tasks
         # sum over all losses on query set across all tasks
         # loss_q = losses_q[-1] / task_num #마지막 원소 사용 -> K step update한 후!
@@ -191,14 +193,16 @@ class Meta(nn.Module):
         
         # loss_q_adv = losses_q_adv[-1] / task_num
         # loss_q_adv = losses_adv / task_num
-
         # optimize theta parameters
         self.meta_optim.zero_grad()
         loss_q.backward()
         self.meta_optim.step()
         accs = corrects / (querysz * task_num)
         accs_adv = corrects_adv / (querysz * task_num)
-        
+
+        # print("final", self.net.parameters()[0].grad)
+
+
         # if need_adv:
         #     self.meta_optim_adv.zero_grad()
         #     loss_q_adv.backward()

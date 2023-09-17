@@ -29,52 +29,23 @@ def main(args):
     # exit()
     # """"""
 
-
-    s = (args.imgsz-2)//2
-    s = (s-2)//2
-    s = s-3
-
-    config = [
-        ('conv2d', [32, 3, 3, 3, 1, 0]),
-        ('relu', [True]),
-        ('bn', [32]),
-        ('max_pool2d', [2, 2, 0]),
-        ('conv2d', [32, 32, 3, 3, 1, 0]),
-        ('relu', [True]),
-        ('bn', [32]),
-        ('max_pool2d', [2, 2, 0]),
-        ('conv2d', [32, 32, 3, 3, 1, 0]),
-        ('relu', [True]),
-        ('bn', [32]),
-        ('max_pool2d', [2, 1, 0]),
-        ('flatten', []),
-        ('linear', [args.n_way, 32 * s * s])
-    ]
-
+    fix_seed()
+    config = set_config(args)
     device = torch.device('cuda:'+str(args.device_num))
 
     if args.pretrained == "":
-        str_path = f"./logs/runs_table/"
+        str_path = f"./logs/runs_table/{args.model}/"
     else:
-        str_path = f"./logs/runs_table_pre/{args.pretrained}/"
-
+        str_path = f"./logs/runs_table_pre/{args.model}/{args.pretrained}/"
     sum_str_path = set_str_path(args)
-    
-    # add_log(args)
-    fix_seed()
-    
+    print(str_path + sum_str_path)
+
     writer = SummaryWriter(str_path + sum_str_path, comment=args.attack)
 
-    print(sum_str_path)
-
     maml = Meta(args, config, device).to(device)
+
     if args.pretrained != "":
-        print(f"use pre-trained model {args.pretrained}")
-        params = torch.load("./pretrained_models/"+args.pretrained)
-        w = torch.nn.Parameter(torch.ones(args.n_way, 32 * s * s))
-        torch.nn.init.kaiming_normal_(w)
-        params['vars.12'] = w
-        params['vars.13'] = torch.nn.Parameter(torch.zeros(args.n_way))
+        params = set_pretrained_model(args, config)
         maml.set_model(params)
     
     tmp = filter(lambda x: x.requires_grad, maml.parameters())
@@ -88,7 +59,6 @@ def main(args):
     for _ in range(args.epoch):
         # fetch meta_batchsz num of episode each time
         db = DataLoader(mini, args.task_num, shuffle=True, num_workers=0, pin_memory=True, drop_last=True)
-        # maml.start_epoch() # lambda 초기화 (0으로)
 
         for step, (x_spt, y_spt, x_qry, y_qry) in enumerate(db):
             tot_step = tot_step + args.task_num
@@ -110,7 +80,7 @@ def main(args):
                 if args.loss.find("WAR")>=0:
                     writer.add_scalar("lambda", maml.get_lambda(), tot_step)
 
-    dir_path = f'./models/{args.imgsz}/'
+    dir_path = f'./models/{args.model}/'
     os.makedirs(dir_path, exist_ok=True)
     str_path = sum_str_path.split("/")
     torch.save(maml.get_model(), f"{dir_path}{args.loss}_{str_path[2]}.pth")
@@ -133,7 +103,6 @@ if __name__ == '__main__':
     argparser.add_argument('--epoch', type=int, help='epoch number', default=30)
     argparser.add_argument('--task_num', type=int, help='meta batch size, namely task num', default=100)
     argparser.add_argument('--meta_lr', type=float, help='meta-level outer learning rate', default=0.001)
-    #argparser.add_argument('--adv_lr', type=float, help='adv-level learning rate', default=0.0002)
     argparser.add_argument('--alpha', type=float, help='R-MAML adv lr rate', default=0.2)
     argparser.add_argument('--update_lr', type=float, help='task-level inner update learning rate', default=0.01)
     argparser.add_argument('--update_step', type=int, help='task-level inner update steps', default=5)
@@ -143,21 +112,13 @@ if __name__ == '__main__':
     # Adversarial training options
     argparser.add_argument('--attack', type=str, default="aRUB")
     argparser.add_argument('--eps', type=float, help='training attack eps', default=6) # 6/255
-    # argparser.add_argument('--rho', type=float, help='aRUB-rho', default=6) # 6/255
     argparser.add_argument('--iter', type=int, help='number of iterations for iterative attack', default=10)
     
     # Loss function options
     argparser.add_argument('--loss', type=str, help='AT, AT-WAR, trades, trades-WAR, no', default="AT")
     argparser.add_argument('--beta', type=float, help='using for trades', default=1.0)
-    argparser.add_argument('--zeta', type=float, help='WAR parameter', default=30)
-    argparser.add_argument('--sche', type=str, help='learning rate scheduler for meta_lr', default='')
-    argparser.add_argument('--sche_arg1', type=float, help='learning rate scheduler argument 1', default=-1)
-    argparser.add_argument('--sche_arg2', type=float, help='learning rate scheduler argument 2', default=-1)
+    argparser.add_argument('--zeta', type=float, help='WAR parameter', default=1.0)
 
     args = argparser.parse_args()
-
-    # check_result = check_args(args)
-    # if not check_result:
-    #     exit()
 
     main(args)

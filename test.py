@@ -17,6 +17,8 @@ from datetime import datetime
 import glob
 import os
 
+from utils import *
+
 q = queue.Queue()
 
 def mean_confidence_interval(accs, confidence=0.95):
@@ -28,32 +30,11 @@ def mean_confidence_interval(accs, confidence=0.95):
 def main(args):
     fix_seed()
 
-    s = (args.imgsz-2)//2
-    s = (s-2)//2
-    s = s-3
-
-    config = [
-        ('conv2d', [32, 3, 3, 3, 1, 0]),
-        ('relu', [True]),
-        ('bn', [32]),
-        ('max_pool2d', [2, 2, 0]),
-        ('conv2d', [32, 32, 3, 3, 1, 0]),
-        ('relu', [True]),
-        ('bn', [32]),
-        ('max_pool2d', [2, 2, 0]),
-        ('conv2d', [32, 32, 3, 3, 1, 0]),
-        ('relu', [True]),
-        ('bn', [32]),
-        ('max_pool2d', [2, 1, 0]),
-        ('flatten', []),
-        ('linear', [args.n_way, 32 * s * s])
-    ]
-
+    config = set_config(args)
     device = torch.device('cuda:'+str(args.device_num))
 
     paths = glob.glob(args.dir_path+"*")
-    #model_paths = [os.path.basename(i) for i in paths]
-    model_paths = ["no_0.001.pth", "trades_PGD-Linf_6.0_0.001_2.0.pth"]
+    model_paths = [os.path.basename(i) for i in paths]
     thread_list = []
 
     if args.auto_version == "custom":
@@ -61,7 +42,7 @@ def main(args):
     else:
         save_str = f"{args.auto_version}_{args.auto_norm}_{args.test_eps}.csv"
     
-    if os.path.isfile(f"./logs/AAresult_csv/{save_str}") == False:
+    if os.path.isfile(f"./logs/AAresult_csv/{args.model}/{save_str}") == False:
         df = pd.DataFrame([], columns=["model", "SA", "RA", "date"])
         df.to_csv(f"./logs/AAresult_csv/{save_str}", header=True, mode='w')
     
@@ -107,73 +88,58 @@ def test_model(maml, path, device):
 
     model = torch.load(str_path)
     maml.set_model(model)
-
-    # loss_type = path.split('_')[0]
-    # if loss_type!="no":
-    #     # loss_arg = path.split('_')[4]
-    #     # maml.set_loss(loss_type, loss_arg)
-    #     maml.set_attack(path.split('_')[1], float(path.split('_')[2]))
     
     mini_test = MiniImagenet('../', mode='test', n_way=args.n_way, k_shot=args.k_spt,
-                                k_query=args.k_qry, batchsz=50, resize=args.imgsz) # batch size = 50 for small scale
+                                k_query=args.k_qry, batchsz=100, resize=args.imgsz) # batch size = 50 for small scale
     db_test = DataLoader(mini_test, 1, shuffle=True, num_workers=0, pin_memory=True)
     auto_list = []
     if args.auto_attack:
         attack_list = ["Auto Attack"]
-        auto_attacks = ['apgd-ce', 'apgd-t', 'fab-t', 'square']
-        for i in range(4):
-            if args.auto_custom[i]=='1':
-                auto_list.append(auto_attacks[i])
-        if len(auto_list)==0:
-            print("auto-custom mode must has at least 1 attack")
-            exit()
+        if args.auto_version == 'custom':
+            auto_attacks = ['apgd-ce', 'apgd-t', 'fab-t', 'square']
+            for i in range(4):
+                if args.auto_custom[i]=='1':
+                    auto_list.append(auto_attacks[i])
+            if len(auto_list)==0:
+                print("auto-custom mode must has at least 1 attack")
+                exit()
     else:
         attack_list = ["BIM_L2", "BIM_Linf", "CnW", "DDN", "EAD", "FGSM", "MI_FGSM", "PGD_L1", "PGD_L2", "PGD_Linf", "Single_pixel", "DeepFool"]
     for _, attack_name in enumerate(attack_list):
         fix_seed()
-        writer = SummaryWriter("./steps/4/"+path, comment=attack_name)
+        #writer = SummaryWriter("./steps/qry/"+path, comment=attack_name)
         print(path, attack_name)
         
         maml.set_test_attack(attack_name, eps=args.test_eps, iter=args.iter, auto_list = auto_list)
         accs_all_test = []
         accsadv_all_test = []
-        #accsadvpr_all_test = []
-        step_accs = [0 for i in range(args.update_step_test+1)]
-        step_accs_adv = [0 for i in range(args.update_step_test+1)]
+
+        # step_accs = [0 for i in range(args.update_step_test+1)]
+        # step_accs_adv = [0 for i in range(args.update_step_test+1)]
 
         for x_spt, y_spt, x_qry, y_qry in db_test:
             x_spt, y_spt, x_qry, y_qry = x_spt.squeeze(0).to(device), y_spt.squeeze(0).to(device), \
                                             x_qry.squeeze(0).to(device), y_qry.squeeze(0).to(device)
 
-            accs, accs_adv, step_acc = maml.finetunning(x_spt, y_spt, x_qry, y_qry)
+            accs, accs_adv = maml.finetunning(x_spt, y_spt, x_qry, y_qry)
             accs_all_test.append(accs)
             accsadv_all_test.append(accs_adv)
-            step_accs = [step_accs[i]+step_acc[i][0] for i in range(args.update_step_test+1)]
-            step_accs_adv = [step_accs_adv[i]+step_acc[i][1] for i in range(args.update_step_test+1)]
-            #accsadvpr_all_test.append(accs_adv_prior)
-        
-        for i in range(args.update_step_test+1):
-            writer.add_scalar("acc", step_accs[i]/10, i)
-            writer.add_scalar("acc_adv", step_accs_adv[i]/10, i)
+
+            # step_accs = [step_accs[i]+step_acc[i][0] for i in range(args.update_step_test+1)]
+            # step_accs_adv = [step_accs_adv[i]+step_acc[i][1] for i in range(args.update_step_test+1)]
+
+        # for i in range(args.update_step_test+1):
+        #     writer.add_scalar("acc", step_accs[i]/test_num, i)
+        #     writer.add_scalar("acc_adv", step_accs_adv[i]/test_num, i)
 
         accs = np.array(accs_all_test).mean(axis=0).astype(np.float16)
         accs_adv = np.array(accsadv_all_test).mean(axis=0).astype(np.float16)
-        #accs_adv_prior = np.array(accsadvpr_all_test).mean(axis=0).astype(np.float16)
+
         t = datetime.today().strftime("%m%d%H%M%S")
         if args.auto_attack:
             q.put([path, accs, accs_adv, t])
         else:
             q.put([path, attack_name, args.test_eps, accs, accs_adv, t])
-
-def fix_seed():
-    seed = 222
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser()
@@ -187,22 +153,14 @@ if __name__ == '__main__':
     argparser.add_argument('--imgc', type=int, help='imgc', default=3)
     
     # Training options
-    # argparser.add_argument('--epoch', type=int, help='epoch number', default=25)
-    # argparser.add_argument('--task_num', type=int, help='meta batch size, namely task num', default=40)
     argparser.add_argument('--meta_lr', type=float, help='meta-level outer learning rate', default=0.001)
-    argparser.add_argument('--adv_lr', type=float, help='adv-level learning rate', default=0.0002)
     argparser.add_argument('--update_lr', type=float, help='task-level inner update learning rate', default=0.01)
-    argparser.add_argument('--update_step', type=int, help='task-level inner update steps', default=5)
     argparser.add_argument('--update_step_test', type=int, help='update steps for finetunning', default=10)
     argparser.add_argument('--device_num', type=int, help='what gpu to use', default=0)
 
     # Adversarial training options
-    # argparser.add_argument('--attack', type=str, default="aRUB")
-    # argparser.add_argument('--eps', type=float, help='training attack eps', default=6) # 6/255
-    # argparser.add_argument('--rho', type=float, help='aRUB-rho', default=6) # 6/255
+
     argparser.add_argument('--iter', type=int, help='number of iterations for iterative attack', default=10)
-    # argparser.add_argument('--trades', action='store_true', help='using trades adversarial training', default=False)
-    # argparser.add_argument('--loss', type=str, help='R-MAML, R-MAML-trades, trades, WAR, no', default="R-MAML")
 
     # adversarial attack options
     argparser.add_argument('--test_attack', type=str, default="PGD-Linf")
