@@ -200,18 +200,52 @@ class Meta(nn.Module):
         accs = corrects / (querysz * task_num)
         accs_adv = corrects_adv / (querysz * task_num)
 
-        # print("final", self.net.parameters()[0].grad)
-
-
-        # if need_adv:
-        #     self.meta_optim_adv.zero_grad()
-        #     loss_q_adv.backward()
-        #     self.meta_optim_adv.step()
-            
-        # else:
-        #     accs_adv = 0
-        
         return accs, accs_adv, losses_item
+    
+    def finetunning(self, x_spt, y_spt, x_qry, y_qry):
+        """
+        :param x_spt:   [setsz, c_, h, w]
+        :param y_spt:   [setsz]
+        :param x_qry:   [querysz, c_, h, w]
+        :param y_qry:   [querysz]
+        :return:
+        """
+        assert len(x_spt.shape) == 4
+
+        querysz = x_qry.size(0)
+        
+        optimizer = torch.optim.SGD(self.net.parameters(), lr=self.update_lr, momentum=0.9, weight_decay=5e-4)
+        
+        net = deepcopy(self.net)
+
+        logits = net(x_spt)
+        loss = F.cross_entropy(logits, y_spt)
+        grad = torch.autograd.grad(loss, net.parameters())
+        fast_weights = list(map(lambda p: p[1] - self.update_lr * p[0], zip(grad, net.parameters())))
+
+        for k in range(1, self.update_step_test):
+            # 1. run the i-th task and compute loss for k=1~K-1
+            logits = net(x_spt, fast_weights, bn_training=True)
+            loss = F.cross_entropy(logits, y_spt)
+
+            grad = torch.autograd.grad(loss, fast_weights)
+            # 3. theta_pi = theta_pi - train_lr * grad
+            fast_weights = list(map(lambda p: p[1] - self.update_lr * p[0], zip(grad, fast_weights)))
+
+            if k==self.update_step - 1:
+                optimizer.zero_grad()
+                data = x_qry
+                label = y_qry
+                with torch.no_grad():
+                    logits_q = net(data, fast_weights, bn_training=True)
+                    pred_q = F.softmax(logits_q, dim=1).argmax(dim=1)
+                    correct = torch.eq(pred_q, label).sum().item()  # convert to numpy
+        
+        accs = correct / querysz
+        accs_adv = self.test_at.run_standard_evaluation(fast_weights, x_qry, y_qry)
+
+        return accs, accs_adv, loss.item() #, step, accs_adv_prior
+    
 
 
     def get_model(self):

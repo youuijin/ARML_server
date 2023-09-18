@@ -56,7 +56,7 @@ def main(args):
                         k_query=args.k_qry, batchsz=4000, resize=args.imgsz) # batch size = 4000 for small scale 
     
     tot_step = -args.task_num
-    for _ in range(args.epoch):
+    for epoch in range(args.epoch):
         # fetch meta_batchsz num of episode each time
         db = DataLoader(mini, args.task_num, shuffle=True, num_workers=0, pin_memory=True, drop_last=True)
 
@@ -79,17 +79,38 @@ def main(args):
                 writer.add_scalar("loss_adv/train", losses_item[2], tot_step)
                 if args.loss.find("WAR")>=0:
                     writer.add_scalar("lambda", maml.get_lambda(), tot_step)
+        # Validation 
+        if epoch % 2 == 0:
+            mini_test = MiniImagenet('../', mode='test', n_way=args.n_way, k_shot=args.k_spt,
+                                k_query=args.k_qry, batchsz=15, resize=args.imgsz)
+            
+            db_test = DataLoader(mini_test, 1, shuffle=True, num_workers=0, pin_memory=True, drop_last=True)
+            
+            accs_all = 0
+            accs_adv_all = 0
+            losses = 0
+
+            for step, (x_spt, y_spt, x_qry, y_qry) in enumerate(db_test):
+                x_spt, y_spt, x_qry, y_qry = x_spt.to(device), y_spt.to(device), x_qry.to(device), y_qry.to(device)
+                accs, accs_adv, loss = maml.finetunning(x_spt, y_spt, x_qry, y_qry)
+                accs_all += accs
+                accs_adv_all += accs_adv
+                losses += loss
+                
+            writer.add_scalar("acc/val", accs/15, epoch)
+            writer.add_scalar("acc_adv/val", accs_adv/15, epoch)
+            writer.add_scalar("loss/val", losses/15, epoch)
 
     dir_path = f'./models/{args.model}/'
     os.makedirs(dir_path, exist_ok=True)
     str_path = sum_str_path.split("/")
-    torch.save(maml.get_model(), f"{dir_path}{args.loss}_{str_path[2]}.pth")
+    torch.save(maml.get_model(), f"{dir_path}{args.loss}_{str_path[1]}.pth")
 
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser()
     # Meta-learning options
-    argparser.add_argument('--model', type=str, help='model architecture', default="conv3")
+    argparser.add_argument('--model', type=str, help='model architecture, conv3, resnet9', default="conv3")
     argparser.add_argument('--pretrained', type=str, help='pretrained model path', default="")
     argparser.add_argument('--n_way', type=int, help='n way', default=5)
     argparser.add_argument('--k_spt', type=int, help='k shot for support set', default=1)

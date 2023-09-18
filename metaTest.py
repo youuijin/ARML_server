@@ -239,26 +239,6 @@ class Meta(nn.Module):
                 self.test_at = AutoAttack(self.net, norm=self.args.auto_norm, eps=eps/255, version=self.args.auto_version, device=self.device)
         else:
             self.test_at = self.setAttack(attack, eps/255, iter=iter)
-
-    # def cal_acc(self, net, x, y, param):
-    #     # logits_q = net(data, fast_weights, bn_training=True)
-    #     # pred_q = F.softmax(logits_q, dim=1).argmax(dim=1)
-    #     # #find the correct index
-    #     # #corr_ind = (torch.eq(pred_q, y_qry) == True).nonzero()
-    #     # correct = torch.eq(pred_q, label).sum().item()  # convert to numpy
-    #     #print(len(x))
-    #     logits = net(x, param, bn_training=True)
-    #     pred = F.softmax(logits, dim=1).argmax(dim=1)
-    #     correct = torch.eq(pred, y).sum().item()
-    #     #print(correct)
-
-    #     # logits_adv = self.test_at.perturb(param, x, y)
-    #     # pred_adv = F.softmax(logits_adv, dim=1).argmax(dim=1)
-    #     # correct_adv = torch.eq(pred, y).sum().item()
-    #     accs_adv = self.test_at.run_standard_evaluation(param, x, y)
-    #     #print(accs_adv)
-
-    #     return correct/len(x), accs_adv
     
 def main():
     pass
