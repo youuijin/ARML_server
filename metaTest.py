@@ -186,7 +186,7 @@ class Meta(nn.Module):
             # step_acc.append([acc, acc_adv])
 
 
-            if k==self.update_step - 1:
+            if k==self.update_step_test - 1:
                 optimizer.zero_grad()
                 data = x_qry
                 label = y_qry

@@ -34,7 +34,8 @@ def main(args):
     device = torch.device('cuda:'+str(args.device_num))
 
     paths = glob.glob(args.dir_path+"*")
-    model_paths = [os.path.basename(i) for i in paths]
+    #model_paths = [os.path.basename(i) for i in paths]
+    model_paths = ['AT_PGD-Linf_6_0.001_0.0008.pth']
     thread_list = []
 
     if args.auto_version == "custom":
@@ -90,7 +91,7 @@ def test_model(maml, path, device):
     maml.set_model(model)
     
     mini_test = MiniImagenet('../', mode='test', n_way=args.n_way, k_shot=args.k_spt,
-                                k_query=args.k_qry, batchsz=100, resize=args.imgsz) # batch size = 50 for small scale
+                                k_query=args.k_qry, batchsz=10, resize=args.imgsz) # batch size = 50 for small scale
     db_test = DataLoader(mini_test, 1, shuffle=True, num_workers=0, pin_memory=True)
     auto_list = []
     if args.auto_attack:
@@ -176,6 +177,7 @@ if __name__ == '__main__':
     argparser.add_argument('--alpha', type=float, help='hyper-parameter for R-MAML-AT', default=0.2)
     argparser.add_argument('--beta', type=float, help='hyper-parameter for R-MAML-AT', default=1.0)
     argparser.add_argument('--zeta', type=float, help='hyper-parameter for R-MAML-AT', default=10)
+    argparser.add_argument('--model', type=str, help='resnet9, conv3', default="conv3")
 
     args = argparser.parse_args()
 

@@ -55,7 +55,7 @@ class Meta(nn.Module):
         #self.meta_optim_adv = optim.Adam(self.net.parameters(), lr=self.adv_lr)
 
         self.at = self.setAttack(args.attack, self.eps/255, self.iter)
-        # self.test_at = self.setAttack(args.attack, self.eps, self.iter)
+        self.test_at = AutoAttack(self.net, norm="Linf", eps=self.eps/255, version="custom", attacks_to_run=['apgd-ce'], device=self.device)
         # self.aa = args.auto_attack
 
     def setAttack(self, str_at, e, iter):
@@ -210,7 +210,7 @@ class Meta(nn.Module):
         :param y_qry:   [querysz]
         :return:
         """
-        assert len(x_spt.shape) == 4
+        # assert len(x_spt.shape) == 4
 
         querysz = x_qry.size(0)
         
