@@ -6,11 +6,8 @@ from    torch.utils.data import DataLoader
 import  argparse
 from    metaTest import Meta
 
-from torch.utils.tensorboard import SummaryWriter
-
 import  threading
 import  queue
-import  random
 import pandas as pd
 from datetime import datetime
 
@@ -34,8 +31,7 @@ def main(args):
     device = torch.device('cuda:'+str(args.device_num))
 
     paths = glob.glob(args.dir_path+"*")
-    #model_paths = [os.path.basename(i) for i in paths]
-    model_paths = ['AT_PGD-Linf_6_0.001_0.0008.pth']
+    model_paths = [os.path.basename(i) for i in paths]
     thread_list = []
 
     if args.auto_version == "custom":
@@ -45,9 +41,9 @@ def main(args):
     
     if os.path.isfile(f"./logs/AAresult_csv/{args.model}/{save_str}") == False:
         df = pd.DataFrame([], columns=["model", "SA", "RA", "date"])
-        df.to_csv(f"./logs/AAresult_csv/{save_str}", header=True, mode='w')
+        df.to_csv(f"./logs/AAresult_csv/{args.model}/{save_str}", header=True, mode='w')
     
-    csvs = pd.read_csv(f"./logs/AAresult_csv/{save_str}")
+    csvs = pd.read_csv(f"./logs/AAresult_csv/{args.model}/{save_str}")
     
     csv_models = []
     for _, data in csvs.iterrows():
@@ -79,7 +75,7 @@ def main(args):
         datas = sorted(datas, key=lambda x: (x[0], x[1]))
         df = pd.DataFrame(datas, columns=["model", "attack", "eps", "SA", "RA"])
     
-    df.to_csv(f"./logs/AAresult_csv/{save_str}", header=False, mode='a')
+    df.to_csv(f"./logs/AAresult_csv/{args.model}/{save_str}", header=False, mode='a')
 
 def test_model(maml, path, device):
     if path=="":
@@ -91,7 +87,7 @@ def test_model(maml, path, device):
     maml.set_model(model)
     
     mini_test = MiniImagenet('../', mode='test', n_way=args.n_way, k_shot=args.k_spt,
-                                k_query=args.k_qry, batchsz=10, resize=args.imgsz) # batch size = 50 for small scale
+                                k_query=args.k_qry, batchsz=50, resize=args.imgsz) # batch size = 50 for small scale
     db_test = DataLoader(mini_test, 1, shuffle=True, num_workers=0, pin_memory=True)
     auto_list = []
     if args.auto_attack:

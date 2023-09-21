@@ -34,9 +34,9 @@ def main(args):
     device = torch.device('cuda:'+str(args.device_num))
 
     if args.pretrained == "":
-        str_path = f"./logs/runs_table/{args.model}/"
+        str_path = f"./logs/runs_table/{args.model}_newrelu/"
     else:
-        str_path = f"./logs/runs_table_pre/{args.model}/{args.pretrained}/"
+        str_path = f"./logs/runs_table_pre/{args.model}_newrelu/{args.pretrained}/"
     sum_str_path = set_str_path(args)
     print(str_path + sum_str_path)
 
@@ -105,7 +105,7 @@ def main(args):
     dir_path = f'./models/{args.model}/'
     os.makedirs(dir_path, exist_ok=True)
     str_path = sum_str_path.split("/")
-    torch.save(maml.get_model(), f"{dir_path}{args.loss}_{str_path[1]}.pth")
+    torch.save(maml.get_model(), f"{dir_path}{args.loss}_{str_path[1]}_newrelu.pth")
 
 
 if __name__ == '__main__':

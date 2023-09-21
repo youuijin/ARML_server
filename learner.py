@@ -74,9 +74,7 @@ class Learner(nn.Module):
                 running_var = nn.Parameter(torch.ones(param[0]), requires_grad=False)
                 self.vars_bn.extend([running_mean, running_var])
             elif name == 'res_basic':
-                # param = [in_channels, out_channels, stride, downsample=False]
-                # 아래로 수정 -> [n_block, ch_out, ch_in, kernelsz, kernelsz, stride, padding]
-                # conv2d, bn, relu, conv2d, bn, add, relu
+                # param = [n_block, ch_out, ch_in, kernelsz, kernelsz, stride, padding]
                 for _ in range(param[0]):
                     # conv2d
                     w = nn.Parameter(torch.ones(*param[1:5]))
@@ -205,11 +203,11 @@ class Learner(nn.Module):
                     idx += 2
                     bn_idx += 2
 
-                    if t == param[0]-1:
-                        x += i
-                    
                     # relu
                     x = F.relu(x, inplace=True)
+
+                    if t == param[0]-1:
+                        x = x + i
 
             elif name == 'flatten':
                 # print(x.shape)
@@ -302,11 +300,12 @@ class Learner(nn.Module):
                     idx += 2
                     bn_idx += 2
                     
-                    if t == param[0]-1:
-                        x += i
-
                     # relu
                     x = F.relu(x, inplace=True)
+
+                    if t == param[0]-1:
+                        x = x + i
+                x = F.relu(x, inplace=True)
 
             elif name == 'flatten':
                 # print(x.shape)
