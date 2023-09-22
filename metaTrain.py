@@ -238,13 +238,14 @@ class Meta(nn.Module):
                 label = y_qry
                 with torch.no_grad():
                     logits_q = net(data, fast_weights, bn_training=True)
+                    loss_q = F.cross_entropy(logits_q, label)
                     pred_q = F.softmax(logits_q, dim=1).argmax(dim=1)
                     correct = torch.eq(pred_q, label).sum().item()  # convert to numpy
         
         accs = correct / querysz
         accs_adv = self.test_at.run_standard_evaluation(fast_weights, x_qry, y_qry)
 
-        return accs, accs_adv, loss.item() #, step, accs_adv_prior
+        return accs, accs_adv, loss_q.item() #, step, accs_adv_prior
     
 
 

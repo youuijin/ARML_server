@@ -81,7 +81,7 @@ def main(args):
                     writer.add_scalar("lambda", maml.get_lambda(), tot_step)
         # Validation 
         if epoch % 2 == 0:
-            mini_test = MiniImagenet('../', mode='test', n_way=args.n_way, k_shot=args.k_spt,
+            mini_test = MiniImagenet('../', mode='val', n_way=args.n_way, k_shot=args.k_spt,
                                 k_query=args.k_qry, batchsz=15, resize=args.imgsz)
             
             db_test = DataLoader(mini_test, 1, shuffle=True, num_workers=0, pin_memory=True, drop_last=True)

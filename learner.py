@@ -206,8 +206,8 @@ class Learner(nn.Module):
                     # relu
                     x = F.relu(x, inplace=True)
 
-                    if t == param[0]-1:
-                        x = x + i
+                x = x + i
+                x = F.relu(x, inplace=True)
 
             elif name == 'flatten':
                 # print(x.shape)
@@ -303,8 +303,7 @@ class Learner(nn.Module):
                     # relu
                     x = F.relu(x, inplace=True)
 
-                    if t == param[0]-1:
-                        x = x + i
+                x = x + i
                 x = F.relu(x, inplace=True)
 
             elif name == 'flatten':
