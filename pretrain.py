@@ -26,8 +26,9 @@ def main(args):
 
     device = torch.device('cuda:'+str(args.device_num))
 
-    str_path = f"./logs/train_pretrained/{args.model}/{args.lr}"
-
+    str_path = f"./logs/train_pretrained/{args.model}/{args.lr}_{args.schedular}"
+    print(str_path)
+    
     fix_seed()
     
     writer = SummaryWriter(str_path)
@@ -45,10 +46,20 @@ def main(args):
 
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(net.parameters(), lr=args.lr, momentum=0.9)
-    #scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lambda epoch: 0.98 ** epoch)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
-    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=20, eta_min=0)
-    # scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[15,40], gamma=0.5)
+    if args.schedular == "no":
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lambda epoch: 1 ** epoch)
+    elif args.schedular == "lambda":
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lambda epoch: 0.95 ** epoch)
+    elif args.schedular == "step":
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
+    elif args.schedular == "cosine":
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=20, eta_min=0)
+    elif args.schedular == "multistep":
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[15,40], gamma=0.5)
+    else:
+        print("learning rate schedular error")
+        exit()
+
     for epoch in range(args.epoch):
         net.train()
         train_loss = 0
@@ -101,7 +112,7 @@ def main(args):
         print(f"epoch: {epoch}\tlr: {scheduler.get_last_lr()}\ttrain acc: {round(train_acc*100, 2)}%, test acc: {round(test_acc*100, 2)}%")
     dir_path = f'./pretrained_models/'
     os.makedirs(dir_path, exist_ok=True)
-    torch.save(net.state_dict(), f"{dir_path}{args.model}_{args.lr}.pth")
+    torch.save(net.state_dict(), f"{dir_path}{args.model}_{args.lr}_{args.schedular}.pth")
 
 
 if __name__ == '__main__':
@@ -119,6 +130,8 @@ if __name__ == '__main__':
     argparser.add_argument('--task_num', type=int, help='meta batch size, namely task num', default=1000)
     argparser.add_argument('--lr', type=float, help='learning rate', default=0.1)
     argparser.add_argument('--device_num', type=int, help='what gpu to use', default=0)
+
+    argparser.add_argument('--schedular', type=str, help='learning rate schedular', default="no")
 
     args = argparser.parse_args()
 
