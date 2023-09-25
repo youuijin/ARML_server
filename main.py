@@ -34,9 +34,9 @@ def main(args):
     device = torch.device('cuda:'+str(args.device_num))
 
     if args.pretrained == "":
-        str_path = f"./logs/runs_table/{args.model}_newrelu/"
+        str_path = f"./logs/runs_table/{args.model}"
     else:
-        str_path = f"./logs/runs_table_pre/{args.model}_newrelu/{args.pretrained}/"
+        str_path = f"./logs/runs_table_pre/{args.model}/{args.pretrained}/"
     sum_str_path = set_str_path(args)
     print(str_path + sum_str_path)
 
@@ -53,37 +53,45 @@ def main(args):
 
     # batchsz here means total episode number
     mini = MiniImagenet('../', mode='train', n_way=args.n_way, k_shot=args.k_spt,
-                        k_query=args.k_qry, batchsz=4000, resize=args.imgsz) # batch size = 4000 for small scale 
+                        k_query=args.k_qry, batchsz=args.train_tasks, resize=args.imgsz) # batch size = 4000 for small scale 
+    mini_test = MiniImagenet('../', mode='val', n_way=args.n_way, k_shot=args.k_spt,
+                                k_query=args.k_qry, batchsz=args.val_tasks, resize=args.imgsz)
     
-    tot_step = -args.task_num
     for epoch in range(args.epoch):
         # fetch meta_batchsz num of episode each time
         db = DataLoader(mini, args.task_num, shuffle=True, num_workers=0, pin_memory=True, drop_last=True)
-
+        
+        accses = 0
+        accses_adv = 0
+        losses_1 = 0
+        losses_2 = 0
+        losses_3 = 0
         for step, (x_spt, y_spt, x_qry, y_qry) in enumerate(db):
-            tot_step = tot_step + args.task_num
 
             x_spt, y_spt, x_qry, y_qry = x_spt.to(device), y_spt.to(device), x_qry.to(device), y_qry.to(device)
 
             accs, accs_adv, losses_item = maml(x_spt, y_spt, x_qry, y_qry)
+            accses += accs*x_spt.shape[0]
+            accses_adv += accs_adv*x_spt.shape[0]
+            losses_1 += losses_item[0]*x_spt.shape[0]
+            losses_2 += losses_item[1]*x_spt.shape[0]
+            losses_3 += losses_item[2]*x_spt.shape[0]
             
-            if step % 40 == 0:
-                print('step:', tot_step,'/',args.epoch*4000)
-                print('\ttraining acc:', accs)
-                print('\ttraining acc_adv:', accs_adv)
-                # print('\tloss:', losses_item[0], losses_item[1], losses_item[2])
-                writer.add_scalar("acc/train", accs, tot_step)
-                writer.add_scalar("acc_adv/train", accs_adv, tot_step)
-                writer.add_scalar("loss/train", losses_item[0], tot_step)
-                writer.add_scalar("loss_clean/train", losses_item[1], tot_step)
-                writer.add_scalar("loss_adv/train", losses_item[2], tot_step)
-                if args.loss.find("WAR")>=0:
-                    writer.add_scalar("lambda", maml.get_lambda(), tot_step)
+            if step % 10 == 0:
+                print('epoch:', epoch, '/', args.epoch, '\tstep:', step*args.task_num, '/', args.train_tasks, '\tacc:', accs, '\tacc_adv:', accs_adv)
+        
+        print('\ttraining acc:', accses/args.train_tasks)
+        print('\ttraining acc_adv:', accses_adv/args.train_tasks)
+        writer.add_scalar("acc/train", accses/args.train_tasks, epoch)
+        writer.add_scalar("acc_adv/train", accses_adv/args.train_tasks, epoch)
+        writer.add_scalar("loss/train", losses_1/args.train_tasks, epoch)
+        writer.add_scalar("loss_clean/train", losses_2/args.train_tasks, epoch)
+        writer.add_scalar("loss_adv/train", losses_3/args.train_tasks, epoch)
+        if args.loss.find("WAR")>=0:
+            writer.add_scalar("lambda", maml.get_lambda(), epoch)
+
         # Validation 
         if epoch % 2 == 0:
-            mini_test = MiniImagenet('../', mode='val', n_way=args.n_way, k_shot=args.k_spt,
-                                k_query=args.k_qry, batchsz=15, resize=args.imgsz)
-            
             db_test = DataLoader(mini_test, 1, shuffle=True, num_workers=0, pin_memory=True, drop_last=True)
             
             accs_all = 0
@@ -98,14 +106,14 @@ def main(args):
                 accs_adv_all += accs_adv
                 losses += loss
                 
-            writer.add_scalar("acc/val", accs_all/15, epoch)
-            writer.add_scalar("acc_adv/val", accs_adv_all/15, epoch)
-            writer.add_scalar("loss/val", losses/15, epoch)
+            writer.add_scalar("acc/val", accs_all/args.val_tasks, epoch)
+            writer.add_scalar("acc_adv/val", accs_adv_all/args.val_tasks, epoch)
+            writer.add_scalar("loss/val", losses/args.val_tasks, epoch)
 
     dir_path = f'./models/{args.model}/'
     os.makedirs(dir_path, exist_ok=True)
     str_path = sum_str_path.split("/")
-    torch.save(maml.get_model(), f"{dir_path}{args.loss}_{str_path[1]}_newrelu.pth")
+    torch.save(maml.get_model(), f"{dir_path}{args.loss}_{str_path[1]}.pth")
 
 
 if __name__ == '__main__':
@@ -120,6 +128,8 @@ if __name__ == '__main__':
     # Dataset options
     argparser.add_argument('--imgsz', type=int, help='imgsz', default=56)
     argparser.add_argument('--imgc', type=int, help='imgc', default=3)
+    argparser.add_argument('--train_tasks', type=int, help='train task num', default=4000)
+    argparser.add_argument('--val_tasks', type=int, help='validation task num', default=15)
     
     # Training options
     argparser.add_argument('--epoch', type=int, help='epoch number', default=30)
