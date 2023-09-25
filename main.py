@@ -6,6 +6,7 @@ from    torch.utils.data import DataLoader
 import  argparse
 from    metaTrain import Meta
 from    utils import *
+from    tqdm.auto import tqdm
 
 
 from torch.utils.tensorboard import SummaryWriter
@@ -57,7 +58,7 @@ def main(args):
     mini_test = MiniImagenet('../', mode='val', n_way=args.n_way, k_shot=args.k_spt,
                                 k_query=args.k_qry, batchsz=args.val_tasks, resize=args.imgsz)
     
-    for epoch in range(args.epoch):
+    for epoch in tqdm(range(args.epoch), position=0, desc='epoch'):
         # fetch meta_batchsz num of episode each time
         db = DataLoader(mini, args.task_num, shuffle=True, num_workers=0, pin_memory=True, drop_last=True)
         
@@ -66,7 +67,7 @@ def main(args):
         losses_1 = 0
         losses_2 = 0
         losses_3 = 0
-        for step, (x_spt, y_spt, x_qry, y_qry) in enumerate(db):
+        for step, (x_spt, y_spt, x_qry, y_qry) in enumerate(tqdm(db, position=1, desc='step', leave=False)):
 
             x_spt, y_spt, x_qry, y_qry = x_spt.to(device), y_spt.to(device), x_qry.to(device), y_qry.to(device)
 
@@ -77,11 +78,11 @@ def main(args):
             losses_2 += losses_item[1]*x_spt.shape[0]
             losses_3 += losses_item[2]*x_spt.shape[0]
             
-            if step % 10 == 0:
-                print('epoch:', epoch, '/', args.epoch, '\tstep:', step*args.task_num, '/', args.train_tasks, '\tacc:', accs, '\tacc_adv:', accs_adv)
+            # if step % 10 == 0:
+            #     print('epoch:', epoch, '/', args.epoch, '\tstep:', step*args.task_num, '/', args.train_tasks, '\tacc:', accs, '\tacc_adv:', accs_adv)
         
-        print('\ttraining acc:', accses/args.train_tasks)
-        print('\ttraining acc_adv:', accses_adv/args.train_tasks)
+        # print('\ttraining acc:', accses/args.train_tasks)
+        # print('\ttraining acc_adv:', accses_adv/args.train_tasks)
         writer.add_scalar("acc/train", accses/args.train_tasks, epoch)
         writer.add_scalar("acc_adv/train", accses_adv/args.train_tasks, epoch)
         writer.add_scalar("loss/train", losses_1/args.train_tasks, epoch)
